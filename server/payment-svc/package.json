@@ -1,0 +1,12 @@
+{
+  "name": "@poker-night/payment-svc",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@poker-night/shared": "*",
+    "express": "^4.19.0",
+    "cors": "^2.8.5",
+    "axios": "^1.7.0",
+    "crypto-js": "^4.2.0"
+  }
+}

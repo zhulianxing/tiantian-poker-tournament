@@ -1,0 +1,13 @@
+{
+  "name": "@poker-night/poker-api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@poker-night/shared": "*",
+    "@poker-night/poker-engine": "*",
+    "express": "^4.19.0",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.0",
+    "bcryptjs": "^2.4.0"
+  }
+}

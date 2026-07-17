@@ -1,0 +1,24 @@
+{
+  "name": "poker-night",
+  "version": "1.0.0",
+  "description": "德州扑克之夜 — 酒吧投币机式 SNG 赛事平台",
+  "private": true,
+  "workspaces": [
+    "server/shared",
+    "server/poker-api",
+    "server/poker-socket",
+    "server/poker-engine",
+    "server/merchant-api",
+    "server/payment-svc"
+  ],
+  "scripts": {
+    "dev": "pm2 start ecosystem.config.js",
+    "stop": "pm2 stop all",
+    "restart": "pm2 restart all",
+    "logs": "pm2 logs",
+    "migrate": "psql -U poker -d poker_night -f server/migrations/001_init.sql"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

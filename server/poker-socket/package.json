@@ -1,0 +1,12 @@
+{
+  "name": "@poker-night/poker-socket",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@poker-night/shared": "*",
+    "@poker-night/poker-engine": "*",
+    "socket.io": "^4.7.0",
+    "express": "^4.19.0",
+    "jsonwebtoken": "^9.0.0"
+  }
+}

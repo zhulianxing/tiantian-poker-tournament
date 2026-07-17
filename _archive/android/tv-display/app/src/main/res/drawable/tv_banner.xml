@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <!-- TV banner for Leanback -->
+    <path
+        android:fillColor="#FF1A1A2E"
+        android:pathData="M0,0h320v180H0z" />
+    <!-- Card icon -->
+    <path
+        android:fillColor="#FF1E3A5F"
+        android:pathData="M100,40h120v100h-120z" />
+    <path
+        android:fillColor="#FFFFD700"
+        android:pathData="M145,65l-8,16l8,-5l8,5z" />
+    <path
+        android:fillColor="#FFFFD700"
+        android:pathData="M155,105l-8,16l8,-5l8,5z" />
+</vector>

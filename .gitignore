@@ -1,0 +1,11 @@
+node_modules/
+*.apk
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+.gradle/
+build/
+.idea/
+*.iml
+.DS_Store
+_env/
+*.env

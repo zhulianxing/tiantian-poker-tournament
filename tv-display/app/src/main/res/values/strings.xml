@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Poker Night TV</string>
+    <string name="connect_title">Poker Night</string>
+    <string name="connect_subtitle">Connect your table display</string>
+    <string name="enter_table_code">Enter Table Code</string>
+    <string name="table_code_hint">6-character code</string>
+    <string name="connect_button">Connect</string>
+    <string name="scan_qr_hint">Scan QR code to download Player App</string>
+    <string name="connecting">Connecting…</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="settings">Settings</string>
+    <string name="hand_history">Hand History</string>
+    <string name="pot_label">Pot</string>
+    <string name="blind_label">Blinds</string>
+    <string name="hand_label">Hand</string>
+    <string name="players_label">Players</string>
+    <string name="countdown_label">Starts in</string>
+    <string name="waiting_players">Waiting for players…</string>
+    <string name="tournament_started">Tournament Started!</string>
+    <string name="tournament_finished">Tournament Finished</string>
+    <string name="rankings">Final Rankings</string>
+    <string name="dealer_button">D</string>
+    <string name="small_blind">SB</string>
+    <string name="big_blind">BB</string>
+    <string name="action_fold">Fold</string>
+    <string name="action_check">Check</string>
+    <string name="action_call">Call</string>
+    <string name="action_raise">Raise</string>
+    <string name="action_allin">All-In</string>
+    <string name="status_waiting">Waiting</string>
+    <string name="status_playing">Playing</string>
+    <string name="status_folded">Folded</string>
+    <string name="status_allin">All-In</string>
+    <string name="status_eliminated">Out</string>
+    <string name="status_empty">Empty</string>
+</resources>

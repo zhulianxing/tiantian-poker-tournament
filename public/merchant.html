@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker Night — 商户后台</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#1A1A2E; color:#fff; font-family:system-ui,sans-serif; }
+.login { display:flex; align-items:center; justify-content:center; height:100vh; }
+.login-box { background:#2a2a4a; padding:40px; border-radius:12px; width:360px; }
+.login-box h1 { color:#FFD700; text-align:center; margin-bottom:30px; }
+.login-box input { width:100%; padding:12px; margin:8px 0; background:#1a1a3e; color:#fff; border:1px solid #444; border-radius:6px; font-size:16px; }
+.login-box button { width:100%; padding:12px; margin-top:20px; background:#4CAF50; color:#fff; border:none; border-radius:6px; font-size:16px; cursor:pointer; }
+.dashboard { display:none; padding:20px; max-width:1200px; margin:0 auto; }
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:30px; }
+.stat-card { background:#2a2a4a; padding:20px; border-radius:12px; text-align:center; }
+.stat-card .value { font-size:32px; color:#FFD700; font-weight:bold; }
+.stat-card .label { color:#aaa; margin-top:8px; font-size:14px; }
+table { width:100%; border-collapse:collapse; }
+th, td { padding:12px; text-align:left; border-bottom:1px solid #333; }
+th { color:#FFD700; }
+.badge { padding:4px 8px; border-radius:4px; font-size:12px; }
+.badge.paid { background:#4CAF50; }
+.badge.pending { background:#FF9800; }
+.badge.refunded { background:#f44336; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const API = '/merchant/api/v1';
+let token = localStorage.getItem('merchantToken') || '';
+let venueName = localStorage.getItem('venueName') || '';
+
+if (token) showDashboard(); else showLogin();
+
+function showLogin() {
+  document.getElementById('app').innerHTML = `
+    <div class="login">
+      <div class="login-box">
+        <h1>🃏 商户后台</h1>
+        <input id="phone" placeholder="手机号" value="" />
+        <input id="password" type="password" placeholder="密码（手机号后4位）" />
+        <button onclick="login()">登录</button>
+      </div>
+    </div>
+  `;
+}
+
+async function login() {
+  const phone = document.getElementById('phone').value;
+  const password = document.getElementById('password').value;
+  try {
+    const res = await fetch(`${API}/merchant/login`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ phone, password })
+    });
+    const data = await res.json();
+    if (data.token) {
+      token = data.token;
+      venueName = data.venue.name;
+      localStorage.setItem('merchantToken', token);
+      localStorage.setItem('venueName', venueName);
+      showDashboard();
+    } else {
+      alert(data.error || '登录失败');
+    }
+  } catch(e) { alert('网络错误'); }
+}
+
+async function showDashboard() {
+  document.getElementById('app').innerHTML = `
+    <div class="dashboard">
+      <h1 style="color:#FFD700;margin-bottom:20px;">🃏 ${venueName} — 商户后台</h1>
+      <div class="stats" id="stats">加载中...</div>
+      <h2 style="color:#FFD700;margin-bottom:16px;">设备管理</h2>
+      <div id="devices">加载中...</div>
+      <h2 style="color:#FFD700;margin:30px 0 16px;">订单列表</h2>
+      <table id="orders"><tr><td>加载中...</td></tr></table>
+    </div>
+  `;
+  loadStats();
+  loadDevices();
+  loadOrders();
+}
+
+async function loadStats() {
+  try {
+    const res = await fetch(`${API}/merchant/stats`, { headers: {'Authorization':`Bearer ${token}`} });
+    const data = await res.json();
+    const t = data.today || {};
+    const total = data.total || {};
+    document.getElementById('stats').innerHTML = `
+      <div class="stat-card"><div class="value">${t.today_orders || 0}</div><div class="label">今日订单</div></div>
+      <div class="stat-card"><div class="value">¥${t.today_venue_income || 0}</div><div class="label">今日收入</div></div>
+      <div class="stat-card"><div class="value">${total.paid_orders || 0}</div><div class="label">累计已付</div></div>
+      <div class="stat-card"><div class="value">¥${total.venue_income || 0}</div><div class="label">累计收入</div></div>
+    `;
+  } catch(e) { document.getElementById('stats').innerHTML = '<p>加载失败</p>'; }
+}
+
+async function loadDevices() {
+  try {
+    const res = await fetch(`${API}/merchant/devices`, { headers: {'Authorization':`Bearer ${token}`} });
+    const data = await res.json();
+    if (data.length === 0) {
+      document.getElementById('devices').innerHTML = '<p style="color:#aaa;">暂无设备，请联系管理员绑定。</p>';
+      return;
+    }
+    document.getElementById('devices').innerHTML = `
+      <table>
+        <tr><th>设备SN</th><th>桌号</th><th>桌台名称</th><th>绑定时间</th></tr>
+        ${data.map(d => `<tr><td>${d.device_sn}</td><td>${d.table_code||'-'}</td><td>${d.table_label||'-'}</td><td>${new Date(d.bound_at).toLocaleString()}</td></tr>`).join('')}
+      </table>
+    `;
+  } catch(e) { document.getElementById('devices').innerHTML = '<p>加载失败</p>'; }
+}
+
+async function loadOrders() {
+  try {
+    const res = await fetch(`${API}/merchant/orders?limit=20`, { headers: {'Authorization':`Bearer ${token}`} });
+    const data = await res.json();
+    const orders = data.orders || [];
+    if (orders.length === 0) {
+      document.getElementById('orders').innerHTML = '<tr><td style="color:#aaa;">暂无订单</td></tr>';
+      return;
+    }
+    document.getElementById('orders').innerHTML = `
+      <tr><th>订单ID</th><th>赛事编号</th><th>金额</th><th>收入</th><th>状态</th><th>时间</th></tr>
+      ${orders.map(o => `<tr>
+        <td>${o.id.substring(0,8)}</td>
+        <td>${o.display_code||'-'}</td>
+        <td>¥${o.amount}</td>
+        <td>¥${o.venue_income}</td>
+        <td><span class="badge ${o.status}">${o.status}</span></td>
+        <td>${new Date(o.created_at).toLocaleString()}</td>
+      </tr>`).join('')}
+    `;
+  } catch(e) { document.getElementById('orders').innerHTML = '<tr><td>加载失败</td></tr>'; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "@poker-night/poker-engine",
+  "version": "1.0.0",
+  "main": "index.js",
+  "description": "德州扑克牌局引擎 — 洗牌、发牌、牌型判定、筹码结算"
+}
