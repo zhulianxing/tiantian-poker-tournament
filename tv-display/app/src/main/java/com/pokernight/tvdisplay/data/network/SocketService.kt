@@ -89,6 +89,8 @@ class SocketService {
                     ServerEvent.TOURNAMENT_FINISHED,
                     ServerEvent.BLIND_LEVEL_UP,
                     ServerEvent.TABLE_STATE,
+                    ServerEvent.SEAT_JOINED,
+                    ServerEvent.SEAT_LEFT,
                 )
 
                 events.forEach { event ->

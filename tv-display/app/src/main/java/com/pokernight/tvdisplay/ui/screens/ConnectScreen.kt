@@ -27,9 +27,7 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import com.pokernight.tvdisplay.ui.theme.*
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
+import com.pokernight.tvdisplay.ui.util.generateQrCode
 
 /**
  * Connect screen — enter table code and connect.
@@ -195,34 +193,6 @@ fun ConnectScreen(
                 }
             }
         }
-    }
-}
-
-/**
- * Generates a QR code bitmap from text using ZXing.
- */
-private fun generateQrCode(text: String): Bitmap? {
-    return try {
-        val hints = hashMapOf<EncodeHintType, Any>()
-        hints[EncodeHintType.MARGIN] = 1
-        val bitMatrix = QRCodeWriter().encode(
-            text,
-            BarcodeFormat.QR_CODE,
-            300,
-            300,
-            hints,
-        )
-        val width = bitMatrix.width
-        val height = bitMatrix.height
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
-            }
-        }
-        bitmap
-    } catch (e: Exception) {
-        null
     }
 }
 

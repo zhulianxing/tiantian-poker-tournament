@@ -19,6 +19,8 @@ object ServerEvent {
     const val TOURNAMENT_FINISHED = "tournament_finished"
     const val BLIND_LEVEL_UP = "blind_level_up"
     const val TABLE_STATE = "table_state"
+    const val SEAT_JOINED = "seat_joined"
+    const val SEAT_LEFT = "seat_left"
     const val CONNECT_ERROR = "connect_error"
     const val DISCONNECT = "disconnect"
 }

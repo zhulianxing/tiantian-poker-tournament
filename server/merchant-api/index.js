@@ -8,7 +8,7 @@ const bcrypt = require('bcryptjs');
 const { query } = require('@poker-night/shared');
 
 const app = express();
-const PORT = process.env.MERCHANT_PORT || 3003;
+const PORT = process.env.MERCHANT_PORT || 3013;
 const JWT_SECRET = process.env.JWT_SECRET || 'poker-night-secret-2026';
 
 app.use(cors());
@@ -200,8 +200,8 @@ app.post('/api/v1/merchant/orders/:id/refund', merchantAuth, async (req, res) =>
     // 调用支付服务退款
     const axios = require('axios');
     const refundResult = await axios.post(
-      `http://localhost:${process.env.PAYMENT_PORT || 3002}/api/v1/payment/refund`,
-      { orderId: parseInt(req.params.id), initiatedBy: 'venue' }
+      `http://localhost:${process.env.PAYMENT_PORT || 3012}/api/v1/refund`,
+      { orderId: parseInt(req.params.id), reason: reason || 'merchant refund' }
     );
 
     if (refundResult.data.success) {
@@ -210,6 +210,90 @@ app.post('/api/v1/merchant/orders/:id/refund', merchantAuth, async (req, res) =>
     } else {
       res.status(500).json(refundResult.data);
     }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 设备管理（统一路径）
+// ============================================================
+
+// 获取设备列表
+app.get('/api/v1/devices', merchantAuth, async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT d.*, t.code as table_code, t.label as table_label
+       FROM device_bindings d
+       LEFT JOIN tables t ON t.device_sn = d.device_sn
+       WHERE d.venue_id = $1 ORDER BY d.bound_at DESC`,
+      [req.merchant.venueId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 绑定设备 SN 到场馆
+app.post('/api/v1/devices/bind', merchantAuth, async (req, res) => {
+  const { deviceSn, tableLabel } = req.body;
+  if (!deviceSn) return res.status(400).json({ error: 'missing deviceSn' });
+
+  try {
+    // 检查设备是否已被其他场馆绑定
+    const existResult = await query(
+      'SELECT * FROM device_bindings WHERE device_sn = $1', [deviceSn]
+    );
+    if (existResult.rows.length > 0 && existResult.rows[0].venue_id !== req.merchant.venueId) {
+      return res.status(409).json({ error: 'device already bound to another venue' });
+    }
+
+    await query(
+      `INSERT INTO device_bindings (device_sn, venue_id, table_label)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (device_sn) DO UPDATE SET venue_id = $2, table_label = $3`,
+      [deviceSn, req.merchant.venueId, tableLabel || null]
+    );
+
+    // 自动创建牌桌
+    const tableCode = generateTableCode();
+    const tableResult = await query(
+      `INSERT INTO tables (venue_id, device_sn, code, label)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (device_sn) DO UPDATE SET label = $4
+       RETURNING *`,
+      [req.merchant.venueId, deviceSn, tableCode, tableLabel || '桌台1']
+    );
+
+    res.json({
+      device: { deviceSn, tableLabel: tableLabel || null },
+      table: tableResult.rows[0],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 解绑设备
+app.delete('/api/v1/devices/:sn', merchantAuth, async (req, res) => {
+  try {
+    // 检查设备是否属于该场馆
+    const existResult = await query(
+      'SELECT * FROM device_bindings WHERE device_sn = $1 AND venue_id = $2',
+      [req.params.sn, req.merchant.venueId]
+    );
+    if (existResult.rows.length === 0) {
+      return res.status(404).json({ error: 'device not found' });
+    }
+
+    await query('DELETE FROM device_bindings WHERE device_sn = $1 AND venue_id = $2',
+      [req.params.sn, req.merchant.venueId]);
+
+    // 清除牌桌的设备关联
+    await query('UPDATE tables SET device_sn = NULL WHERE device_sn = $1', [req.params.sn]);
+
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

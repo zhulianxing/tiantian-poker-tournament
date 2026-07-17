@@ -6,11 +6,13 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { query, db } = require('@poker-night/shared');
 const { ORDER_STATUS, FEE_SPLIT } = require('@poker-night/shared');
 
 const app = express();
-const PORT = process.env.PAYMENT_PORT || 3002;
+const PORT = process.env.PAYMENT_PORT || 3012;
+const JWT_SECRET = process.env.JWT_SECRET || 'poker-night-secret-2026';
 
 // 虎皮椒配置
 const XUNHU_API = process.env.XUNHU_API || 'https://api.xunhupay.com';
@@ -21,6 +23,20 @@ const XUNHU_ALIPAY_URL = process.env.XUNHU_ALIPAY_URL || ''; // 支付宝通道
 
 app.use(cors());
 app.use(express.json());
+
+// ============================================================
+// 中间件：JWT 鉴权（商户或管理员）
+// ============================================================
+function auth(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'no token' });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'invalid token' });
+  }
+}
 
 // ============================================================
 // 健康检查
@@ -181,16 +197,19 @@ app.post('/api/v1/payment/notify', async (req, res) => {
 });
 
 // ============================================================
-// 退款
+// 退款（增强版）
 // ============================================================
-app.post('/api/v1/payment/refund', async (req, res) => {
-  const { orderId, initiatedBy } = req.body;
+app.post('/api/v1/refund', auth, async (req, res) => {
+  const { orderId, reason } = req.body;
+
+  if (!orderId) return res.status(400).json({ error: 'missing orderId' });
+  if (!reason) return res.status(400).json({ error: 'missing reason' });
 
   try {
     const orderResult = await query('SELECT * FROM orders WHERE id = $1', [orderId]);
     const order = orderResult.rows[0];
     if (!order) return res.status(404).json({ error: 'order not found' });
-    if (order.status !== ORDER_STATUS.PAID) return res.status(400).json({ error: 'order not paid' });
+    if (order.status !== ORDER_STATUS.PAID) return res.status(400).json({ error: 'order not in paid state' });
 
     // 调用虎皮椒退款 API
     const params = {
@@ -205,14 +224,116 @@ app.post('/api/v1/payment/refund', async (req, res) => {
     const refundResult = await axios.post(`${XUNHU_API}/refund.do`, params);
 
     if (refundResult.data.errcode === 0) {
-      await query(
-        'UPDATE orders SET status = $1, refunded_at = NOW(), refund_initiated_by = $2 WHERE id = $3',
-        [ORDER_STATUS.REFUNDED, initiatedBy || 'system', orderId]
-      );
-      res.json({ success: true });
+      const client = await db.connect();
+      try {
+        await client.query('BEGIN');
+
+        // 更新订单状态
+        await client.query(
+          'UPDATE orders SET status = $1, refunded_at = NOW(), refund_reason = $2, refund_initiated_by = $3 WHERE id = $4',
+          [ORDER_STATUS.REFUNDED, reason, req.user.name || req.user.id || 'system', orderId]
+        );
+
+        // 冲销分账记录
+        await client.query(
+          `UPDATE orders SET platform_fee = 0, venue_income = 0 WHERE id = $1`,
+          [orderId]
+        );
+
+        // 如果有关联赛事，取消赛事
+        if (order.tournament_id) {
+          await client.query(
+            'UPDATE tournaments SET status = $1 WHERE id = $2 AND status != $3',
+            ['cancelled', order.tournament_id, 'finished']
+          );
+        }
+
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+
+      // 通知相关方
+      // 通知 Socket.IO 服务
+      try {
+        const { io } = require('../poker-socket');
+        if (io) {
+          io.emit('order_refunded', { orderId, tournamentId: order.tournament_id, reason });
+        }
+      } catch (e) {
+        // poker-socket 可能未启动，忽略
+      }
+
+      res.json({ success: true, orderId, status: 'refunded' });
     } else {
       res.status(500).json({ error: 'refund failed', detail: refundResult.data.errmsg });
     }
+  } catch (err) {
+    console.error('[Payment] Refund error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 订单列表（商户/管理员查看）
+// ============================================================
+app.get('/api/v1/orders', auth, async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+  const offset = (page - 1) * limit;
+  const { startDate, endDate, status, venueId } = req.query;
+
+  try {
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    let paramIdx = 1;
+
+    // 如果是商户身份，只能看自己的订单
+    if (req.user.venueId && !req.user.isAdmin) {
+      whereClause += ` AND o.venue_id = $${paramIdx++}`;
+      params.push(req.user.venueId);
+    } else if (venueId) {
+      whereClause += ` AND o.venue_id = $${paramIdx++}`;
+      params.push(venueId);
+    }
+
+    if (startDate) {
+      whereClause += ` AND o.created_at >= $${paramIdx++}`;
+      params.push(startDate);
+    }
+    if (endDate) {
+      whereClause += ` AND o.created_at <= $${paramIdx++}`;
+      params.push(endDate);
+    }
+    if (status) {
+      whereClause += ` AND o.status = $${paramIdx++}`;
+      params.push(status);
+    }
+
+    const result = await query(
+      `SELECT o.*, t.display_code, t.status as tournament_status, v.name as venue_name
+       FROM orders o
+       LEFT JOIN tournaments t ON o.tournament_id = t.id
+       LEFT JOIN venues v ON o.venue_id = v.id
+       ${whereClause}
+       ORDER BY o.created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
+      [...params, limit, offset]
+    );
+
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM orders o ${whereClause}`,
+      params
+    );
+
+    res.json({
+      orders: result.rows,
+      total: parseInt(countResult.rows[0].total),
+      page,
+      limit,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

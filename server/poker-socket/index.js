@@ -13,13 +13,15 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
-const PORT = process.env.POKER_SOCKET_PORT || 3001;
+const PORT = process.env.POKER_SOCKET_PORT || 3011;
 const JWT_SECRET = process.env.JWT_SECRET || 'poker-night-secret-2026';
 
 // 活跃赛事管理器（tournamentId → SNGManager）
 const activeGames = new Map();
 // 倒计时定时器
 const countdownTimers = new Map();
+// 断线玩家追踪（playerId → { tournamentId, disconnectedAt, missedHands }）
+const disconnectedPlayers = new Map();
 
 // ============================================================
 // 中间件：JWT 鉴权
@@ -50,6 +52,17 @@ io.on('connection', (socket) => {
   socket.on('join_table', (tableCode) => {
     socket.join(`table:${tableCode}`);
     console.log(`[Socket] ${socket.id} joined table:${tableCode}`);
+
+    // 检查是否是重连玩家
+    if (socket.player) {
+      for (const [tid, game] of activeGames) {
+        const player = game.players.find(p => p.id === socket.player.id);
+        if (player) {
+          handleReconnect(socket, tid);
+          break;
+        }
+      }
+    }
   });
 
   // 玩家操作
@@ -70,8 +83,87 @@ io.on('connection', (socket) => {
   // 断线处理
   socket.on('disconnect', () => {
     console.log(`[Socket] Disconnected: ${socket.id}`);
+    handleDisconnect(socket);
   });
 });
+
+// ============================================================
+// 断线处理
+// ============================================================
+async function handleDisconnect(socket) {
+  if (!socket.player) return;
+
+  const playerId = socket.player.id;
+
+  // 查找玩家参与的活跃赛事
+  let tournamentId = null;
+  for (const [tid, game] of activeGames) {
+    const player = game.players.find(p => p.id === playerId);
+    if (player && player.status !== 'eliminated') {
+      tournamentId = tid;
+      // 标记为 sitout
+      if (player.status === 'playing') {
+        player.status = 'sitout';
+        console.log(`[Socket] Player ${playerId} marked sitout in tournament ${tid}`);
+      }
+      break;
+    }
+  }
+
+  if (!tournamentId) return;
+
+  // 记录断线信息
+  disconnectedPlayers.set(playerId, {
+    tournamentId,
+    disconnectedAt: Date.now(),
+    missedHands: 0,
+  });
+
+  // 通知牌桌
+  const tResult = await query(
+    `SELECT t.code FROM tournaments t JOIN tables tbl ON t.table_id = tbl.id WHERE t.id = $1`,
+    [tournamentId]
+  );
+  const tableCode = tResult.rows[0]?.code;
+  if (tableCode) {
+    io.to(`table:${tableCode}`).emit('player_disconnected', { playerId, nickname: socket.player.nickname });
+  }
+}
+
+// ============================================================
+// 玩家重连处理
+// ============================================================
+function handleReconnect(socket, tournamentId) {
+  const playerId = socket.player.id;
+  const discInfo = disconnectedPlayers.get(playerId);
+  if (!discInfo) return;
+
+  // 检查是否超过 3 局未回归
+  if (discInfo.missedHands >= 3) {
+    // 自动淘汰
+    const game = activeGames.get(discInfo.tournamentId);
+    if (game) {
+      const player = game.players.find(p => p.id === playerId);
+      if (player) {
+        player.status = 'eliminated';
+        game.emit('player_eliminated', { playerId, reason: 'disconnected 3 hands' });
+      }
+    }
+    disconnectedPlayers.delete(playerId);
+    return;
+  }
+
+  // 恢复玩家状态
+  const game = activeGames.get(discInfo.tournamentId);
+  if (game) {
+    const player = game.players.find(p => p.id === playerId);
+    if (player && player.status === 'sitout') {
+      player.status = 'playing';
+      console.log(`[Socket] Player ${playerId} reconnected`);
+    }
+  }
+  disconnectedPlayers.delete(playerId);
+}
 
 // ============================================================
 // 赛事激活（由支付回调触发）
@@ -220,7 +312,27 @@ async function startTournament(tournamentId) {
 }
 
 // 导出供外部调用
-module.exports = { io, server, activateTournament, startTournament, cancelTournament };
+module.exports = { io, server, activateTournament, startTournament, cancelTournament, handleReconnect };
+
+// 每手结束后检查断线玩家
+setInterval(() => {
+  for (const [playerId, info] of disconnectedPlayers) {
+    info.missedHands++;
+    if (info.missedHands >= 3) {
+      // 自动淘汰
+      const game = activeGames.get(info.tournamentId);
+      if (game) {
+        const player = game.players.find(p => p.id === playerId);
+        if (player && player.status !== 'eliminated') {
+          player.status = 'eliminated';
+          game.emit('player_eliminated', { playerId, reason: 'disconnected 3 hands' });
+          console.log(`[Socket] Player ${playerId} eliminated after 3 missed hands`);
+        }
+      }
+      disconnectedPlayers.delete(playerId);
+    }
+  }
+}, 60000); // 每分钟检查一次
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Poker Socket] running on port ${PORT}`);

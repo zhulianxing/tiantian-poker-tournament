@@ -4,6 +4,7 @@ data class PlayerSeat(
     val seatIndex: Int = 0,
     val playerId: String = "",
     val nickname: String = "",
+    val avatar: String = "\uD83C\uDCCF",  // 🃏 default card emoji
     val chipCount: Int = 0,
     val status: String = "empty",
     val isDealer: Boolean = false,
@@ -17,6 +18,7 @@ data class PlayerSeat(
                 seatIndex = seatIndex,
                 playerId = map["playerId"] as? String ?: "",
                 nickname = map["nickname"] as? String ?: "",
+                avatar = map["avatar"] as? String ?: "\uD83C\uDCCF",
                 chipCount = (map["chipCount"] as? Number)?.toInt() ?: 0,
                 status = map["status"] as? String ?: "empty",
                 isDealer = (map["isDealer"] as? Boolean) ?: false,

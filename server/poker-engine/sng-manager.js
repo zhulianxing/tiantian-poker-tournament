@@ -25,6 +25,8 @@ class SNGManager {
     this.blindTimer = null;
     this.currentHand = null;
     this.dealerIndex = 0; // 庄家位置（座位号）
+    this.actionTimer = null; // 操作超时定时器
+    this.actionTimeout = (tournament.action_timeout || SNG_DEFAULTS.ACTION_TIMEOUT) * 1000;
   }
 
   /**
@@ -164,6 +166,9 @@ class SNGManager {
       currentBet: bb,
       actingIndex,
     });
+
+    // 启动操作倒计时
+    this.startActionTimer(actingIndex);
   }
 
   /**
@@ -259,6 +264,9 @@ class SNGManager {
 
     hand.actions.push(result);
 
+    // 玩家已操作，清除倒计时
+    this.clearActionTimer();
+
     // 广播操作结果
     this.emit('action_result', {
       playerId,
@@ -308,6 +316,40 @@ class SNGManager {
 
     hand.actingIndex = nextIndex;
     this.emit('turn_changed', { actingIndex: nextIndex, handNumber: hand.handNumber });
+
+    // 重置操作倒计时
+    this.startActionTimer(nextIndex);
+  }
+
+  /**
+   * 启动操作超时定时器
+   */
+  startActionTimer(seatIndex) {
+    this.clearActionTimer();
+    const player = this.players.find(p => p.seatIndex === seatIndex);
+    if (!player) return;
+
+    this.actionTimer = setTimeout(() => {
+      // 超时自动弃牌
+      console.log(`[SNG] Player ${player.id} timed out, auto-fold`);
+      this.handleAction(player.id, ACTIONS.FOLD);
+    }, this.actionTimeout);
+
+    this.emit('action_timer_started', {
+      seatIndex,
+      playerId: player.id,
+      timeoutMs: this.actionTimeout,
+    });
+  }
+
+  /**
+   * 清除操作超时定时器
+   */
+  clearActionTimer() {
+    if (this.actionTimer) {
+      clearTimeout(this.actionTimer);
+      this.actionTimer = null;
+    }
   }
 
   /**
@@ -362,6 +404,9 @@ class SNGManager {
     hand.lastRaiserIndex = firstActive; // 一开始没人加注
 
     this.emit('turn_changed', { actingIndex: firstActive, handNumber: hand.handNumber });
+
+    // 重置操作倒计时
+    this.startActionTimer(firstActive);
   }
 
   /**
@@ -444,6 +489,9 @@ class SNGManager {
     const hand = this.currentHand;
     if (!hand) return;
 
+    // 清除操作倒计时
+    this.clearActionTimer();
+
     if (winner) {
       // 单人获胜（其他人都弃牌了）
       winner.chipCount += hand.pot;
@@ -486,6 +534,8 @@ class SNGManager {
       clearInterval(this.blindTimer);
       this.blindTimer = null;
     }
+
+    this.clearActionTimer();
 
     this.tournament.status = TOURNAMENT_STATUS.FINISHED;
     this.tournament.finished_at = new Date();

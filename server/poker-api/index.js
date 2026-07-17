@@ -9,7 +9,7 @@ const { db, query } = require('@poker-night/shared');
 const { TOURNAMENT_STATUS, PLAYER_STATUS, ACTIONS, SNG_DEFAULTS } = require('@poker-night/shared');
 
 const app = express();
-const PORT = process.env.POKER_API_PORT || 3000;
+const PORT = process.env.POKER_API_PORT || 3010;
 const JWT_SECRET = process.env.JWT_SECRET || 'poker-night-secret-2026';
 
 app.use(cors());
@@ -181,15 +181,76 @@ app.post('/api/v1/tournaments/:id/join', auth, async (req, res) => {
 
     await client.query('COMMIT');
 
-    // 触发 Socket.IO 通知（由外部监听处理）
-    app.locals.io?.emit('seat_joined', {
-      tournamentId: tournament.id,
-      playerId: req.player.id,
-      nickname: req.player.nickname,
-      seatIndex,
-    });
+    // 通过 Socket.IO 广播给牌桌房间
+    const tableResult = await query('SELECT code FROM tables WHERE id = $1', [tournament.table_id]);
+    const tableCode = tableResult.rows[0]?.code;
+    if (tableCode) {
+      app.locals.io?.to(`table:${tableCode}`).emit('seat_joined', {
+        tournamentId: tournament.id,
+        playerId: req.player.id,
+        nickname: req.player.nickname,
+        seatIndex,
+        chipCount: tournament.start_chips,
+      });
+    }
 
     res.json({ success: true, seatIndex, chipCount: tournament.start_chips });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(400).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// 玩家离开座位
+app.post('/api/v1/tournaments/:id/leave', auth, async (req, res) => {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 检查赛事状态
+    const tResult = await client.query('SELECT * FROM tournaments WHERE id = $1 FOR UPDATE', [req.params.id]);
+    const tournament = tResult.rows[0];
+    if (!tournament) throw new Error('tournament not found');
+    if (!['registering', 'started'].includes(tournament.status)) throw new Error('cannot leave at this stage');
+
+    // 检查玩家是否已入座
+    const existResult = await client.query(
+      'SELECT * FROM tournament_players WHERE tournament_id = $1 AND player_id = $2',
+      [tournament.id, req.player.id]
+    );
+    if (existResult.rows.length === 0) throw new Error('not joined');
+
+    const playerRecord = existResult.rows[0];
+
+    // 删除入座记录
+    await client.query(
+      'DELETE FROM tournament_players WHERE tournament_id = $1 AND player_id = $2',
+      [tournament.id, req.player.id]
+    );
+
+    // 更新人数
+    await client.query(
+      'UPDATE tournaments SET player_count = GREATEST(player_count - 1, 0) WHERE id = $1',
+      [tournament.id]
+    );
+
+    await client.query('COMMIT');
+
+    // 通过 Socket.IO 广播给牌桌房间
+    const tableResult = await query('SELECT code FROM tables WHERE id = $1', [tournament.table_id]);
+    const tableCode = tableResult.rows[0]?.code;
+    if (tableCode) {
+      app.locals.io?.to(`table:${tableCode}`).emit('seat_left', {
+        tournamentId: tournament.id,
+        playerId: req.player.id,
+        nickname: req.player.nickname,
+        seatIndex: playerRecord.seat_index,
+      });
+    }
+
+    res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(400).json({ error: err.message });

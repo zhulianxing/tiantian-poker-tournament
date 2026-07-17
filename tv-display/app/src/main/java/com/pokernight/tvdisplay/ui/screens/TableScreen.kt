@@ -25,6 +25,7 @@ import com.pokernight.tvdisplay.ui.theme.*
 
 /**
  * Main table screen — shows the full poker table with seats, community cards, and pot.
+ * Only used when phase == "started".
  */
 @Composable
 fun TableScreen(
@@ -51,11 +52,7 @@ fun TableScreen(
                 .fillMaxWidth(),
             contentAlignment = Alignment.Center,
         ) {
-            if (state.phase == "finished") {
-                TournamentFinishedView(state = state)
-            } else {
-                PokerTableContent(state = state)
-            }
+            PokerTableContent(state = state)
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -186,85 +183,13 @@ private fun CenterArea(state: TableState) {
             }
         }
 
-        // Countdown
-        if (state.countdown > 0) {
-            Text(
-                text = "Tournament starts in ${state.countdown}s",
-                color = RedAction,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-
-        // Waiting message
-        if (state.phase == "registering" && state.countdown == 0) {
-            Text(
-                text = "Waiting for players to join…",
-                color = TextSecondary,
-                fontSize = 16.sp,
-            )
-        }
-
         // Current bet
-        if (state.currentBet > 0 && state.phase == "started") {
+        if (state.currentBet > 0) {
             Text(
                 text = "Current Bet: ${state.currentBet}",
                 color = GoldAccent,
                 fontSize = 14.sp,
             )
-        }
-    }
-}
-
-/**
- * Tournament finished view showing rankings.
- */
-@Composable
-private fun TournamentFinishedView(state: TableState) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.padding(32.dp),
-    ) {
-        Text(
-            text = "🏆 Tournament Finished 🏆",
-            color = GoldAccent,
-            fontSize = 36.sp,
-            fontWeight = FontWeight.Bold,
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        state.rankings.forEachIndexed { index, ranking ->
-            val name = ranking["nickname"] as? String ?: "Player ${index + 1}"
-            val chips = (ranking["finalChips"] as? Number)?.toInt() ?: 0
-            val medal = when (index) {
-                0 -> "🥇"
-                1 -> "🥈"
-                2 -> "🥉"
-                else -> "${index + 1}."
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SeatBg)
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "$medal $name",
-                    color = if (index == 0) GoldAccent else TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = formatPot(chips),
-                    color = ChipGreen,
-                    fontSize = 18.sp,
-                )
-            }
         }
     }
 }

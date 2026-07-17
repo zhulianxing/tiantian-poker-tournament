@@ -101,19 +101,28 @@ fun PlayerSeatView(
                 verticalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxSize(),
             ) {
-                // Top row: nickname + dealer button
+                // Top row: avatar + nickname + dealer button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = seat.nickname.ifEmpty { "Player ${seat.seatIndex + 1}" },
-                        color = TextPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = seat.avatar.ifEmpty { "\uD83C\uDCCF" },
+                            fontSize = 18.sp,
+                        )
+                        Text(
+                            text = seat.nickname.ifEmpty { "Player ${seat.seatIndex + 1}" },
+                            color = TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    }
                     if (seat.isDealer) {
                         Box(
                             modifier = Modifier

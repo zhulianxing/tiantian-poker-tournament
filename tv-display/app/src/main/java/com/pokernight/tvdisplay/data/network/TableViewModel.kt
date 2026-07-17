@@ -76,6 +76,25 @@ class TableViewModel : ViewModel() {
         _connectionError.value = null
     }
 
+    /**
+     * Reset phase to idle — called by FinishedScreen after auto-display timeout.
+     * Server will also push a TABLE_STATE event to sync.
+     */
+    fun resetToIdle() {
+        _uiState.update {
+            it.copy(
+                phase = Phase.IDLE,
+                rankings = emptyList(),
+                seats = emptyList(),
+                pot = 0,
+                communityCards = emptyList(),
+                stage = "",
+                handNumber = 0,
+                countdown = 0,
+            )
+        }
+    }
+
     private fun handleEvent(event: String, data: JSONObject) {
         Log.d(TAG, "handleEvent: $event")
 
@@ -267,6 +286,7 @@ class TableViewModel : ViewModel() {
                 val dealerIndex = data.optInt("dealerIndex", 0)
                 val handNumber = data.optInt("handNumber", _uiState.value.handNumber)
                 val stage = data.optString("stage", _uiState.value.stage)
+                val displayCode = data.optString("displayCode", _uiState.value.displayCode)
 
                 _uiState.update {
                     it.copy(
@@ -281,7 +301,45 @@ class TableViewModel : ViewModel() {
                         dealerIndex = dealerIndex,
                         handNumber = handNumber,
                         stage = stage,
+                        displayCode = displayCode,
                     )
+                }
+            }
+
+            ServerEvent.SEAT_JOINED -> {
+                val seatIndex = data.optInt("seatIndex", -1)
+                val nickname = data.optString("nickname", "")
+                val avatar = data.optString("avatar", "\uD83C\uDCCF")
+                val playerId = data.optString("playerId", "")
+                if (seatIndex >= 0) {
+                    _uiState.update { state ->
+                        val updatedSeats = state.seats.toMutableList()
+                        while (updatedSeats.size <= seatIndex) {
+                            updatedSeats.add(PlayerSeat(seatIndex = updatedSeats.size, status = PlayerStatus.EMPTY))
+                        }
+                        updatedSeats[seatIndex] = PlayerSeat(
+                            seatIndex = seatIndex,
+                            playerId = playerId,
+                            nickname = nickname,
+                            avatar = avatar,
+                            status = PlayerStatus.WAITING,
+                            chipCount = 1000,
+                        )
+                        state.copy(seats = updatedSeats)
+                    }
+                }
+            }
+
+            ServerEvent.SEAT_LEFT -> {
+                val seatIndex = data.optInt("seatIndex", -1)
+                if (seatIndex >= 0) {
+                    _uiState.update { state ->
+                        val updatedSeats = state.seats.mapIndexed { index, seat ->
+                            if (index == seatIndex) PlayerSeat(seatIndex = index, status = PlayerStatus.EMPTY)
+                            else seat
+                        }
+                        state.copy(seats = updatedSeats)
+                    }
                 }
             }
         }
