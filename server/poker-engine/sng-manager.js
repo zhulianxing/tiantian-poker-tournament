@@ -47,7 +47,11 @@ class SNGManager {
     this.startBlindTimer();
 
     // 开始第一手
-    this.startNewHand();
+    try {
+      this.startNewHand();
+    } catch (e) {
+      console.error('[SNG] startNewHand error:', e.message, e.stack);
+    }
   }
 
   /**
@@ -527,7 +531,13 @@ class SNGManager {
 
     // 开始下一手
     this.currentHand = null;
-    setTimeout(() => this.startNewHand(), 3000); // 3 秒间隔
+    setTimeout(() => {
+      try {
+        this.startNewHand();
+      } catch (e) {
+        console.error('[SNG] startNewHand (after finish) error:', e.message, e.stack);
+      }
+    }, 3000); // 3 秒间隔
   }
 
   /**

@@ -414,7 +414,7 @@ async function startTournament(tournamentId) {
 
     console.log(`[Socket] Tournament ${tournament.display_code} started`);
   } catch (err) {
-    console.error('[Socket] Start error:', err.message);
+    console.error('[Socket] Start error:', err.message, err.stack);
   }
 }
 
