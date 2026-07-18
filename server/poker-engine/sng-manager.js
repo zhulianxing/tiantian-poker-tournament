@@ -89,6 +89,20 @@ class SNGManager {
       return;
     }
 
+    // 检查是否所有玩家筹码都不够付 BB → 按筹码排名结束
+    const { sb: _sb, bb: _bb } = this.getCurrentBlinds();
+    const canAffordBlind = activePlayers.filter(p => p.chipCount > 0);
+    if (canAffordBlind.length === 0 || (canAffordBlind.length === 1 && activePlayers.length > 1)) {
+      // 所有玩家筹码耗尽，按当前筹码排名
+      this.finish();
+      return;
+    }
+    // 如果只剩 2 人且双方筹码都不够 BB，直接结束
+    if (activePlayers.length === 2 && activePlayers.every(p => p.chipCount < _bb)) {
+      this.finish();
+      return;
+    }
+
     this.handNumber++;
 
     // 移动庄家位
@@ -748,13 +762,14 @@ class SNGManager {
     this.tournament.status = TOURNAMENT_STATUS.FINISHED;
     this.tournament.finished_at = new Date();
 
-    // 排名：最后淘汰的排前面
+    // 排名：存活者按筹码降序排列，淘汰者按淘汰顺序倒排
     const eliminated = this.players.filter(p => p.status === PLAYER_STATUS.ELIMINATED);
-    const survivors = this.players.filter(p => p.status !== PLAYER_STATUS.ELIMINATED);
+    const survivors = this.players.filter(p => p.status !== PLAYER_STATUS.ELIMINATED)
+      .sort((a, b) => b.chipCount - a.chipCount);
 
     const rankings = [
-      ...survivors.map(p => ({ playerId: p.id, rank: 1, chips: p.chipCount, nickname: p.nickname })),
-      ...eliminated.reverse().map((p, i) => ({ playerId: p.id, rank: i + 2, chips: 0, nickname: p.nickname })),
+      ...survivors.map((p, i) => ({ playerId: p.id, rank: i + 1, chips: p.chipCount, nickname: p.nickname })),
+      ...eliminated.reverse().map((p, i) => ({ playerId: p.id, rank: survivors.length + i + 1, chips: 0, nickname: p.nickname })),
     ];
 
     console.log(`[SNG] Tournament ${this.tournament.id} finished. Rankings:`);
