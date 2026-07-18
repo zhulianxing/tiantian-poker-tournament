@@ -109,14 +109,15 @@ class TableViewModel : ViewModel() {
             }
 
             ServerEvent.TOURNAMENT_STARTED -> {
-                _uiState.update { it.copy(phase = Phase.STARTED, countdown = 0) }
+                // Parse seats from tournament_started event
+                val seats = parseSeats(data.optJSONArray("seats"))
+                _uiState.update { it.copy(phase = Phase.STARTED, countdown = 0, seats = seats) }
             }
 
             ServerEvent.NEW_HAND -> {
                 _uiState.update {
                     it.copy(
                         communityCards = emptyList(),
-                        pot = 0,
                         stage = Stage.PREFLOP,
                         actingIndex = -1,
                     )
@@ -144,6 +145,7 @@ class TableViewModel : ViewModel() {
                         currentBet = currentBet,
                         actingIndex = actingIndex,
                         seats = seats,
+                        communityCards = emptyList(), // Clear community cards on new hand
                     )
                 }
             }
@@ -152,19 +154,25 @@ class TableViewModel : ViewModel() {
                 val stage = data.optString("stage", "")
                 val communityCards = parseCards(data.optJSONArray("communityCards"))
                 val pot = data.optInt("pot", 0)
+                val seats = parseSeats(data.optJSONArray("seats"))
                 _uiState.update {
                     it.copy(
                         stage = stage,
                         communityCards = communityCards,
                         pot = pot,
+                        seats = seats.ifEmpty { it.seats },
                     )
                 }
             }
 
             ServerEvent.TURN_CHANGED -> {
                 val actingIndex = data.optInt("actingIndex", -1)
+                val seats = parseSeats(data.optJSONArray("seats"))
                 _uiState.update {
-                    it.copy(actingIndex = actingIndex)
+                    it.copy(
+                        actingIndex = actingIndex,
+                        seats = seats.ifEmpty { it.seats },
+                    )
                 }
             }
 
@@ -172,28 +180,44 @@ class TableViewModel : ViewModel() {
                 val playerId = data.optString("playerId", "")
                 val action = data.optString("action", "")
                 val amount = data.optInt("amount", 0)
-                val actionText = buildActionText(action, amount)
                 val pot = data.optInt("pot", _uiState.value.pot)
+                val currentBet = data.optInt("currentBet", _uiState.value.currentBet)
+                val actingIndex = data.optInt("actingIndex", -1)
+                val seatsFromServer = parseSeats(data.optJSONArray("seats"))
+                val actionText = buildActionText(action, amount)
 
                 _uiState.update { state ->
-                    val updatedSeats = state.seats.map { seat ->
-                        if (seat.playerId == playerId) {
-                            seat.copy(
-                                lastAction = actionText,
-                                status = if (action == "fold") PlayerStatus.FOLDED
-                                    else if (action == "allin") PlayerStatus.ALL_IN
-                                    else seat.status,
-                                isActing = false,
-                                currentBet = if (action == "fold") seat.currentBet
-                                    else seat.currentBet + amount,
-                                chipCount = if (action == "fold") seat.chipCount
-                                    else seat.chipCount - amount,
-                            )
-                        } else {
-                            seat
+                    // Use server seats if provided, otherwise update locally
+                    val updatedSeats = if (seatsFromServer.isNotEmpty()) {
+                        seatsFromServer.map { seat ->
+                            // Mark acting player
+                            val isActing = seat.seatIndex == actingIndex
+                            // Add last action text for the acting player
+                            val lastAction = if (seat.playerId == playerId) actionText else seat.lastAction
+                            seat.copy(isActing = isActing, lastAction = lastAction)
+                        }
+                    } else {
+                        // Fallback: local update
+                        state.seats.map { seat ->
+                            if (seat.playerId == playerId) {
+                                seat.copy(
+                                    lastAction = actionText,
+                                    status = if (action == "fold") PlayerStatus.FOLDED
+                                        else if (action == "allin") PlayerStatus.ALL_IN
+                                        else seat.status,
+                                    isActing = false,
+                                )
+                            } else {
+                                seat.copy(isActing = seat.seatIndex == actingIndex)
+                            }
                         }
                     }
-                    state.copy(seats = updatedSeats, pot = pot)
+                    state.copy(
+                        seats = updatedSeats,
+                        pot = pot,
+                        currentBet = currentBet,
+                        actingIndex = actingIndex,
+                    )
                 }
 
                 // Add to hand history
@@ -202,27 +226,44 @@ class TableViewModel : ViewModel() {
 
             ServerEvent.SHOWDOWN -> {
                 val pot = data.optInt("pot", 0)
-                val winners = data.optJSONArray("winners")
+                val winnersArray = data.optJSONArray("winners")
+                val winnerNames = mutableListOf<String>()
+                if (winnersArray != null) {
+                    for (i in 0 until winnersArray.length()) {
+                        val w = winnersArray.optJSONObject(i)
+                        if (w != null) {
+                            val name = w.optString("handName", "")
+                            if (name.isNotEmpty()) winnerNames.add(name)
+                        }
+                    }
+                }
                 _uiState.update { it.copy(stage = Stage.SHOWDOWN, pot = pot) }
-                // Winners details can be displayed in hand_result
             }
 
             ServerEvent.HAND_RESULT -> {
                 val handNumber = data.optInt("handNumber", 0)
                 val winnerId = data.optString("winnerId", "")
                 val pot = data.optInt("pot", 0)
+                val seats = parseSeats(data.optJSONArray("seats"))
 
                 _uiState.update { state ->
-                    val updatedSeats = state.seats.map { seat ->
-                        if (seat.playerId == winnerId) {
-                            seat.copy(chipCount = seat.chipCount + pot)
-                        } else {
-                            seat
+                    val updatedSeats = if (seats.isNotEmpty()) {
+                        // Use server seats (already updated with correct chips)
+                        seats
+                    } else {
+                        // Fallback: add pot to winner locally
+                        state.seats.map { seat ->
+                            if (seat.playerId == winnerId) {
+                                seat.copy(chipCount = seat.chipCount + pot)
+                            } else {
+                                seat
+                            }
                         }
                     }
                     state.copy(
                         seats = updatedSeats,
                         pot = 0,
+                        currentBet = 0,
                         actingIndex = -1,
                     )
                 }
@@ -275,11 +316,12 @@ class TableViewModel : ViewModel() {
 
             ServerEvent.TABLE_STATE -> {
                 // Full state sync from server
-                val phase = data.optString("phase", _uiState.value.phase)
+                val phase = data.optString("phase", _uiState.value.phase).lowercase()
                 val blindLevel = data.optInt("blindLevel", _uiState.value.blindLevel)
                 val sb = data.optInt("sb", _uiState.value.sb)
                 val bb = data.optInt("bb", _uiState.value.bb)
                 val pot = data.optInt("pot", _uiState.value.pot)
+                val currentBet = data.optInt("currentBet", _uiState.value.currentBet)
                 val communityCards = parseCards(data.optJSONArray("communityCards"))
                 val seats = parseSeats(data.optJSONArray("seats"))
                 val actingIndex = data.optInt("actingIndex", -1)
@@ -287,6 +329,7 @@ class TableViewModel : ViewModel() {
                 val handNumber = data.optInt("handNumber", _uiState.value.handNumber)
                 val stage = data.optString("stage", _uiState.value.stage)
                 val displayCode = data.optString("displayCode", _uiState.value.displayCode)
+                val countdown = data.optInt("countdown", _uiState.value.countdown)
 
                 _uiState.update {
                     it.copy(
@@ -295,6 +338,7 @@ class TableViewModel : ViewModel() {
                         sb = sb,
                         bb = bb,
                         pot = pot,
+                        currentBet = currentBet,
                         communityCards = communityCards,
                         seats = seats,
                         actingIndex = actingIndex,
@@ -302,6 +346,7 @@ class TableViewModel : ViewModel() {
                         handNumber = handNumber,
                         stage = stage,
                         displayCode = displayCode,
+                        countdown = countdown,
                     )
                 }
             }
@@ -311,6 +356,7 @@ class TableViewModel : ViewModel() {
                 val nickname = data.optString("nickname", "")
                 val avatar = data.optString("avatar", "\uD83C\uDCCF")
                 val playerId = data.optString("playerId", "")
+                val chipCount = data.optInt("chipCount", 1000)
                 if (seatIndex >= 0) {
                     _uiState.update { state ->
                         val updatedSeats = state.seats.toMutableList()
@@ -323,7 +369,7 @@ class TableViewModel : ViewModel() {
                             nickname = nickname,
                             avatar = avatar,
                             status = PlayerStatus.WAITING,
-                            chipCount = 1000,
+                            chipCount = chipCount,
                         )
                         state.copy(seats = updatedSeats)
                     }

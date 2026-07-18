@@ -19,7 +19,7 @@ const { SNG_DEFAULTS, TOURNAMENT_STATUS, PLAYER_STATUS, ACTIONS } = require('../
 class SNGManager {
   constructor(tournament, players) {
     this.tournament = tournament;
-    this.players = players; // [{id, seatIndex, chipCount, status}]
+    this.players = players; // [{id, seatIndex, chipCount, status, nickname}]
     this.handNumber = 0;
     this.blindLevel = 1;
     this.blindTimer = null;
@@ -30,15 +30,12 @@ class SNGManager {
   }
 
   /**
-   * 开始赛事
+   * 启动赛事
    */
   start() {
-    this.tournament.status = TOURNAMENT_STATUS.STARTED;
-    this.tournament.started_at = new Date();
-
-    // 所有玩家状态改为 playing
+    // 所有等待中玩家改为 playing
     for (const p of this.players) {
-      if (p.status === PLAYER_STATUS.WAITING) {
+      if (p.status === 'waiting' || p.status === PLAYER_STATUS.WAITING) {
         p.status = PLAYER_STATUS.PLAYING;
       }
     }
@@ -73,43 +70,32 @@ class SNGManager {
   /**
    * 获取当前盲注
    */
-  getBlinds() {
-    const sb = SNG_DEFAULTS.START_BLIND_SB * Math.pow(2, this.blindLevel - 1);
+  getCurrentBlinds() {
+    const base = this.tournament.start_blind || SNG_DEFAULTS.START_BLIND_SB;
+    const sb = base * Math.pow(2, this.blindLevel - 1);
     const bb = sb * 2;
     return { sb, bb };
-  }
-
-  /**
-   * 获取活跃玩家（非淘汰、非弃牌）
-   */
-  getActivePlayers() {
-    return this.players.filter(p =>
-      p.status === PLAYER_STATUS.PLAYING || p.status === PLAYER_STATUS.ALLIN
-    );
-  }
-
-  /**
-   * 获取未弃牌玩家
-   */
-  getNonFoldedPlayers() {
-    return this.players.filter(p =>
-      p.status !== PLAYER_STATUS.FOLDED && p.status !== PLAYER_STATUS.ELIMINATED
-    );
   }
 
   /**
    * 开始新一手牌
    */
   startNewHand() {
+    // 检查赛事是否结束
     const activePlayers = this.getActivePlayers();
     if (activePlayers.length <= 1) {
-      // 只剩 1 人，赛事结束
       this.finish();
       return;
     }
 
     this.handNumber++;
-    const { sb, bb } = this.getBlinds();
+
+    // 移动庄家位
+    if (this.handNumber > 1) {
+      this.dealerIndex = this.nextActiveSeat(this.dealerIndex);
+    }
+
+    const { sb, bb } = this.getCurrentBlinds();
 
     // 洗牌
     const deck = shuffle(createDeck());
@@ -126,12 +112,11 @@ class SNGManager {
     const river = deal(deck, 1);
     const communityCards = [...flop, ...turn, ...river];
 
-    // 收盲注
+    // SB/BB 位置（收盲注前计算）
     const sbIndex = this.nextActiveSeat(this.dealerIndex);
     const bbIndex = this.nextActiveSeat(sbIndex);
-    const actingIndex = this.nextActiveSeat(bbIndex);
 
-    // 先创建 currentHand，再收盲注（collectBlind 会修改 pot）
+    // 先创建 currentHand，再收盲注（collectBlind 会修改 pot 和玩家状态）
     this.currentHand = {
       handNumber: this.handNumber,
       deck,
@@ -142,7 +127,7 @@ class SNGManager {
       pot: 0,
       currentBet: bb,
       minRaise: bb,
-      actingIndex,
+      actingIndex: -1, // 收盲注后重新计算
       lastRaiserIndex: bbIndex,
       actions: [],
     };
@@ -150,8 +135,43 @@ class SNGManager {
     this.collectBlind(sbIndex, sb);
     this.collectBlind(bbIndex, bb);
 
-    // pot 现在等于 sb + bb（由 collectBlind 累加）
-    // 如果 sb 玩家 all-in，pot 可能小于 sb+bb，保持实际值
+    // 收盲注后重新计算第一个行动者（可能 SB/BB 收盲注后 allin）
+    let actingIndex = this.nextActiveSeat(bbIndex);
+
+    // 如果没有可行动玩家（全部 allin），直接发完公共牌到摊牌
+    if (actingIndex === -1) {
+      this.currentHand.actingIndex = -1;
+      this.emit('new_hand', {
+        handNumber: this.handNumber,
+        dealerIndex: this.dealerIndex,
+        sbIndex,
+        bbIndex,
+        pot: this.currentHand.pot,
+        seats: this.getSeatsSnapshot(),
+      });
+
+      for (const [pid, cards] of Object.entries(holeCards)) {
+        this.emit('hole_cards', { playerId: pid, cards });
+      }
+
+      this.emit('hand_started', {
+        handNumber: this.handNumber,
+        stage: 'preflop',
+        pot: this.currentHand.pot,
+        currentBet: bb,
+        actingIndex: -1,
+        seats: this.getSeatsSnapshot(),
+        dealerIndex: this.dealerIndex,
+        sbIndex,
+        bbIndex,
+      });
+
+      // 全员 allin，直接 run out board
+      setTimeout(() => this.runOutBoard(), 1000);
+      return;
+    }
+
+    this.currentHand.actingIndex = actingIndex;
 
     this.emit('new_hand', {
       handNumber: this.handNumber,
@@ -199,7 +219,7 @@ class SNGManager {
   }
 
   /**
-   * 找下一个活跃座位
+   * 找下一个活跃座位（PLAYING 状态，可以行动的）
    */
   nextActiveSeat(fromIndex) {
     const seats = this.players
@@ -211,6 +231,42 @@ class SNGManager {
       if (s > fromIndex) return s;
     }
     return seats[0]; // 绕回
+  }
+
+  /**
+   * 获取活跃玩家（PLAYING + ALLIN）
+   */
+  getActivePlayers() {
+    return this.players.filter(p =>
+      p.status === PLAYER_STATUS.PLAYING || p.status === PLAYER_STATUS.ALLIN
+    );
+  }
+
+  /**
+   * 获取未弃牌玩家
+   */
+  getNonFoldedPlayers() {
+    return this.players.filter(p =>
+      p.status !== PLAYER_STATUS.FOLDED && p.status !== PLAYER_STATUS.ELIMINATED
+    );
+  }
+
+  /**
+   * 获取当前座位快照（用于事件广播）
+   */
+  getSeatsSnapshot() {
+    return this.players.map(p => ({
+      seatIndex: p.seatIndex,
+      playerId: p.id,
+      nickname: p.nickname || p.id.substring(0, 8),
+      chipCount: p.chipCount,
+      status: p.status,
+      currentBet: this.currentHand && this.currentHand.actions
+        ? this.currentHand.actions
+          .filter(a => a.playerId === p.id)
+          .reduce((sum, a) => sum + (a.amount || 0), 0)
+        : 0,
+    }));
   }
 
   /**
@@ -237,7 +293,7 @@ class SNGManager {
         result.success = true;
         break;
 
-      case ACTIONS.CALL:
+      case ACTIONS.CALL: {
         const callAmount = Math.min(hand.currentBet, player.chipCount);
         player.chipCount -= callAmount;
         hand.pot += callAmount;
@@ -245,8 +301,9 @@ class SNGManager {
         if (player.chipCount === 0) player.status = PLAYER_STATUS.ALLIN;
         result.success = true;
         break;
+      }
 
-      case ACTIONS.RAISE:
+      case ACTIONS.RAISE: {
         if (amount <= hand.currentBet) return { error: 'raise must be higher than current bet' };
         const raiseAmount = Math.min(amount, player.chipCount);
         player.chipCount -= raiseAmount;
@@ -257,8 +314,9 @@ class SNGManager {
         if (player.chipCount === 0) player.status = PLAYER_STATUS.ALLIN;
         result.success = true;
         break;
+      }
 
-      case ACTIONS.ALLIN:
+      case ACTIONS.ALLIN: {
         const allinAmount = player.chipCount;
         hand.pot += allinAmount;
         if (allinAmount > hand.currentBet) {
@@ -270,6 +328,7 @@ class SNGManager {
         result.amount = allinAmount;
         result.success = true;
         break;
+      }
 
       default:
         return { error: 'unknown action' };
@@ -289,6 +348,7 @@ class SNGManager {
       pot: hand.pot,
       currentBet: hand.currentBet,
       actingIndex: hand.actingIndex,
+      seats: this.getSeatsSnapshot(),
     });
 
     // 检查是否本轮下注结束
@@ -385,13 +445,6 @@ class SNGManager {
     hand.currentBet = 0;
     hand.lastRaiserIndex = -1;
 
-    // 将 folded 以外的玩家恢复为 playing
-    for (const p of this.players) {
-      if (p.status === PLAYER_STATUS.PLAYING) {
-        // 保持
-      }
-    }
-
     const nextStage = stages[currentIdx + 1];
     hand.stage = nextStage;
 
@@ -434,13 +487,13 @@ class SNGManager {
     while (hand.revealedCommunity.length < 5) {
       if (hand.revealedCommunity.length === 0) {
         hand.revealedCommunity = hand.communityCards.slice(0, 3);
-        this.emit('stage_changed', { stage: 'flop', communityCards: hand.revealedCommunity, pot: hand.pot });
+        this.emit('stage_changed', { stage: 'flop', communityCards: hand.revealedCommunity, pot: hand.pot, handNumber: hand.handNumber, seats: this.getSeatsSnapshot() });
       } else if (hand.revealedCommunity.length === 3) {
         hand.revealedCommunity = hand.communityCards.slice(0, 4);
-        this.emit('stage_changed', { stage: 'turn', communityCards: hand.revealedCommunity, pot: hand.pot });
+        this.emit('stage_changed', { stage: 'turn', communityCards: hand.revealedCommunity, pot: hand.pot, handNumber: hand.handNumber, seats: this.getSeatsSnapshot() });
       } else if (hand.revealedCommunity.length === 4) {
         hand.revealedCommunity = hand.communityCards.slice(0, 5);
-        this.emit('stage_changed', { stage: 'river', communityCards: hand.revealedCommunity, pot: hand.pot });
+        this.emit('stage_changed', { stage: 'river', communityCards: hand.revealedCommunity, pot: hand.pot, handNumber: hand.handNumber, seats: this.getSeatsSnapshot() });
       }
     }
     this.showdown();
@@ -581,23 +634,6 @@ class SNGManager {
     ];
 
     this.emit('tournament_finished', { rankings, seats: this.getSeatsSnapshot() });
-  }
-
-  /**
-   * 获取当前座位快照（用于事件广播）
-   */
-  getSeatsSnapshot() {
-    return this.players.map(p => ({
-      seatIndex: p.seatIndex,
-      playerId: p.id,
-      nickname: p.nickname || p.id.substring(0, 8),
-      chipCount: p.chipCount,
-      status: p.status,
-      currentBet: this.currentHand && this.currentHand.actions ?
-        this.currentHand.actions
-          .filter(a => a.playerId === p.id)
-          .reduce((sum, a) => sum + (a.amount || 0), 0) : 0,
-    }));
   }
 
   /**

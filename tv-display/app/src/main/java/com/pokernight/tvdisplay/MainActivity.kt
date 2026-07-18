@@ -53,6 +53,12 @@ class MainActivity : ComponentActivity() {
                         state = state,
                         viewModel = viewModel,
                     )
+
+                    // Fallback for any unknown phase
+                    else -> IdleScreen(
+                        state = state,
+                        viewModel = viewModel,
+                    )
                 }
             }
         }

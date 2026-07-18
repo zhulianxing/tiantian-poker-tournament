@@ -146,51 +146,46 @@ private fun CenterArea(state: TableState) {
         modifier = Modifier.padding(vertical = 16.dp),
     ) {
         // Stage label
-        if (state.stage.isNotEmpty()) {
-            Text(
-                text = state.stage.uppercase(),
-                color = GoldAccent,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        val stageDisplay = if (state.stage.isNotEmpty()) state.stage.uppercase() else "WAITING"
+        Text(
+            text = stageDisplay,
+            color = GoldAccent,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+        )
 
         // Community cards
         CommunityCardsRow(cards = state.communityCards)
 
-        // Pot display
-        if (state.pot > 0) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "🏆",
-                    color = GoldAccent,
-                    fontSize = 20.sp,
-                )
-                Text(
-                    text = "POT",
-                    color = TextSecondary,
-                    fontSize = 14.sp,
-                )
-                Text(
-                    text = formatPot(state.pot),
-                    color = GoldAccent,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-
-        // Current bet
-        if (state.currentBet > 0) {
+        // Pot display — always show, even when 0
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                text = "Current Bet: ${state.currentBet}",
+                text = "🏆",
                 color = GoldAccent,
+                fontSize = 20.sp,
+            )
+            Text(
+                text = "POT",
+                color = TextSecondary,
                 fontSize = 14.sp,
             )
+            Text(
+                text = formatPot(state.pot),
+                color = GoldAccent,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+            )
         }
+
+        // Current bet — always show
+        Text(
+            text = "Bet: ${state.currentBet}",
+            color = if (state.currentBet > 0) GoldAccent else TextSecondary,
+            fontSize = 14.sp,
+        )
     }
 }
 
