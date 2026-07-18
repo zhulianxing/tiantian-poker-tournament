@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker Night - 支付结果</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0a0a0a;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.container{max-width:420px;width:100%}
+.card{background:#1a1a1a;border-radius:16px;padding:36px 28px;box-shadow:0 4px 24px rgba(0,0,0,0.4);text-align:center}
+.success-icon{width:72px;height:72px;margin:0 auto 20px;border-radius:50%;background:#07c160;display:flex;align-items:center;justify-content:center;animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+.checkmark{width:36px;height:36px}
+.checkmark polyline{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:48;stroke-dashoffset:48;animation:draw .4s .3s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.title{font-size:22px;font-weight:700;color:#FFD700;margin-bottom:24px}
+.info-list{background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:28px;text-align:left}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0}
+.info-row:not(:last-child){border-bottom:1px solid #222}
+.info-label{font-size:13px;color:#888}
+.info-value{font-size:15px;font-weight:600;color:#e0e0e0}
+.btn{display:inline-block;width:100%;padding:14px;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;transition:opacity .2s,transform .1s}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:#FFD700;color:#0a0a0a}
+.loading-text{font-size:13px;color:#666;margin-top:12px}
+.error-icon{width:72px;height:72px;margin:0 auto 20px;border-radius:50%;background:#ff5050;display:flex;align-items:center;justify-content:center;animation:pop .5s ease}
+.error-icon span{font-size:36px;color:#fff;font-weight:700}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div id="successSection" style="display:none">
+      <div class="success-icon">
+        <svg class="checkmark" viewBox="0 0 52 52">
+          <polyline points="14 27 22 35 38 17"/>
+        </svg>
+      </div>
+      <div class="title">支付成功</div>
+      <div class="info-list">
+        <div class="info-row">
+          <span class="info-label">订单号</span>
+          <span class="info-value" id="orderId">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">支付金额</span>
+          <span class="info-value" id="amount">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">赛事编号</span>
+          <span class="info-value" id="displayCode">—</span>
+        </div>
+      </div>
+      <a class="btn btn-primary" href="https://pokernight.cc/download">返回下载页</a>
+    </div>
+
+    <div id="pendingSection" style="display:none">
+      <div class="success-icon" style="background:#FFD700">
+        <div class="spinner" style="width:32px;height:32px;border:3px solid rgba(0,0,0,0.2);border-top-color:#0a0a0a;border-radius:50%;animation:spin .8s linear infinite"></div>
+      </div>
+      <div class="title">支付确认中</div>
+      <p style="color:#888;font-size:14px;margin-bottom:24px">正在确认支付结果，请稍候…</p>
+      <div class="info-list">
+        <div class="info-row">
+          <span class="info-label">订单号</span>
+          <span class="info-value" id="orderIdPending">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="errorSection" style="display:none">
+      <div class="error-icon"><span>!</span></div>
+      <div class="title" style="color:#ff5050">支付失败</div>
+      <p id="errorMsg" style="color:#888;font-size:14px;margin-bottom:24px">未能完成支付</p>
+      <a class="btn btn-primary" href="https://pokernight.cc/download">返回下载页</a>
+    </div>
+
+    <div id="loadingSection">
+      <div class="success-icon" style="background:#333">
+        <div class="spinner" style="width:32px;height:32px;border:3px solid #444;border-top-color:#FFD700;border-radius:50%;animation:spin .8s linear infinite"></div>
+      </div>
+      <div class="title" style="color:#888">加载中…</div>
+    </div>
+  </div>
+</div>
+<style>
+.spinner{display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+<script>
+function getParam(name) {
+  var u = new URLSearchParams(window.location.search);
+  return u.get(name) || '';
+}
+
+var orderId = getParam('order');
+var pollCount = 0;
+var maxPoll = 6;
+
+function showSection(id) {
+  ['successSection','pendingSection','errorSection','loadingSection'].forEach(function(s) {
+    document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
+  });
+}
+
+async function checkOrder() {
+  if (!orderId) {
+    document.getElementById('errorMsg').textContent = '缺少订单参数';
+    showSection('errorSection');
+    return;
+  }
+  try {
+    var resp = await fetch('/pay/api/v1/payment/order/' + encodeURIComponent(orderId));
+    if (!resp.ok) {
+      var err = await resp.json().catch(function(){ return {}; });
+      throw new Error(err.message || ('请求失败 (' + resp.status + ')'));
+    }
+    var data = await resp.json();
+    var status = data.status || data.orderStatus || '';
+    // 成功
+    if (status === 'success' || status === 'paid' || status === 'completed' || status === 1 || status === '1') {
+      document.getElementById('orderId').textContent = orderId;
+      document.getElementById('amount').textContent = data.amount != null ? '¥ ' + Number(data.amount).toFixed(2) : '¥ —';
+      document.getElementById('displayCode').textContent = data.display_code || data.displayCode || '—';
+      showSection('successSection');
+      return;
+    }
+    // 失败
+    if (status === 'failed' || status === 'expired' || status === 'cancelled' || status === -1) {
+      document.getElementById('errorMsg').textContent = data.failReason || '支付未完成或已取消';
+      showSection('errorSection');
+      return;
+    }
+    // 待处理 — 轮询
+    pollCount++;
+    if (pollCount >= maxPoll) {
+      document.getElementById('orderIdPending').textContent = orderId;
+      showSection('pendingSection');
+      // 继续尝试
+      pollCount = 0;
+    } else {
+      document.getElementById('orderIdPending').textContent = orderId;
+      showSection('pendingSection');
+    }
+    setTimeout(checkOrder, 3000);
+  } catch(e) {
+    document.getElementById('errorMsg').textContent = '查询订单失败: ' + e.message;
+    showSection('errorSection');
+  }
+}
+
+// 初始延迟3秒后查询（给支付回调时间）
+setTimeout(checkOrder, 1000);
+</script>
+</body>
+</html>

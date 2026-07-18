@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker Night - 支付发起</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0a0a0a;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.container{max-width:420px;width:100%}
+.card{background:#1a1a1a;border-radius:16px;padding:32px 28px;box-shadow:0 4px 24px rgba(0,0,0,0.4)}
+.header{text-align:center;margin-bottom:28px}
+.logo{font-size:28px;font-weight:700;color:#FFD700;letter-spacing:2px;margin-bottom:6px}
+.subtitle{font-size:13px;color:#888}
+.table-info{background:#111;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:24px}
+.table-info .label{font-size:12px;color:#666;margin-bottom:4px}
+.table-info .value{font-size:18px;font-weight:600;color:#e0e0e0;margin-bottom:16px}
+.table-info .value:last-child{margin-bottom:0}
+.amount-section{text-align:center;margin-bottom:28px}
+.amount-label{font-size:13px;color:#888;margin-bottom:8px}
+.amount-value{font-size:36px;font-weight:700;color:#FFD700}
+.pay-methods{display:flex;flex-direction:column;gap:12px}
+.pay-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s,transform .1s}
+.pay-btn:active{transform:scale(0.98)}
+.pay-btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn-wechat{background:#07c160;color:#fff}
+.btn-alipay{background:#1677ff;color:#fff}
+.loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:999}
+.loading-overlay.show{display:flex}
+.spinner{width:36px;height:36px;border:3px solid #333;border-top-color:#FFD700;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-msg{background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);color:#ff5050;padding:12px;border-radius:8px;font-size:14px;text-align:center;margin-bottom:16px;display:none}
+.error-msg.show{display:block}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="header">
+      <div class="logo">♠ Poker Night</div>
+      <div class="subtitle">扫码支付发起费用</div>
+    </div>
+    <div id="error" class="error-msg"></div>
+    <div id="tableInfo" class="table-info" style="display:none">
+      <div class="label">牌桌名称</div>
+      <div class="value" id="tableName">—</div>
+      <div class="label">赛事编号</div>
+      <div class="value" id="displayCode">—</div>
+    </div>
+    <div class="amount-section" id="amountSection" style="display:none">
+      <div class="amount-label">发起费用</div>
+      <div class="amount-value" id="amount">¥ —</div>
+    </div>
+    <div class="pay-methods" id="payMethods" style="display:none">
+      <button class="pay-btn btn-wechat" id="btnWechat" onclick="createPayment('wechat')">微信支付</button>
+      <button class="pay-btn btn-alipay" id="btnAlipay" onclick="createPayment('alipay')">支付宝</button>
+    </div>
+    <div id="loadingInfo" style="text-align:center;color:#888;font-size:14px;padding:40px 0">正在加载牌桌信息…</div>
+  </div>
+</div>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+</div>
+<script>
+var tableCode = '';
+var tableData = null;
+
+function getParam(name) {
+  var u = new URLSearchParams(window.location.search);
+  return u.get(name) || '';
+}
+
+function showError(msg) {
+  var el = document.getElementById('error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function showLoading(b) {
+  document.getElementById('loadingOverlay').classList.toggle('show', b);
+}
+
+// 获取牌桌信息
+async function loadTableInfo() {
+  tableCode = getParam('table');
+  if (!tableCode) {
+    document.getElementById('loadingInfo').textContent = '';
+    showError('缺少牌桌参数');
+    return;
+  }
+  try {
+    var resp = await fetch('/api/v1/tables/' + encodeURIComponent(tableCode));
+    if (!resp.ok) {
+      var err = await resp.json().catch(function(){ return {}; });
+      throw new Error(err.message || ('请求失败 (' + resp.status + ')'));
+    }
+    var data = await resp.json();
+    tableData = data;
+    document.getElementById('loadingInfo').style.display = 'none';
+    document.getElementById('tableInfo').style.display = 'block';
+    document.getElementById('amountSection').style.display = 'block';
+    document.getElementById('payMethods').style.display = 'flex';
+
+    document.getElementById('tableName').textContent = data.name || data.tableName || tableCode;
+    document.getElementById('displayCode').textContent = data.display_code || data.displayCode || '—';
+
+    var fee = data.entryFee || data.entry_fee || data.fee;
+    if (fee != null) {
+      document.getElementById('amount').textContent = '¥ ' + Number(fee).toFixed(2);
+    } else {
+      document.getElementById('amount').textContent = '¥ —';
+    }
+  } catch(e) {
+    document.getElementById('loadingInfo').textContent = '';
+    showError('获取牌桌信息失败: ' + e.message);
+  }
+}
+
+// 创建支付
+async function createPayment(method) {
+  var btns = document.querySelectorAll('.pay-btn');
+  btns.forEach(function(b){ b.disabled = true; });
+  showLoading(true);
+  try {
+    var resp = await fetch('/pay/api/v1/payment/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tableId: tableData ? (tableData.id || tableData.tableId || tableCode) : tableCode,
+        paymentMethod: method
+      })
+    });
+    if (!resp.ok) {
+      var err = await resp.json().catch(function(){ return {}; });
+      throw new Error(err.message || ('支付创建失败 (' + resp.status + ')'));
+    }
+    var data = await resp.json();
+    if (data.payUrl) {
+      window.location.href = data.payUrl;
+    } else {
+      throw new Error('未收到支付链接');
+    }
+  } catch(e) {
+    btns.forEach(function(b){ b.disabled = false; });
+    showLoading(false);
+    showError(e.message);
+  }
+}
+
+loadTableInfo();
+</script>
+</body>
+</html>
