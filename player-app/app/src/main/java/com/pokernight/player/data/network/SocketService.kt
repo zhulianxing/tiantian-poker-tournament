@@ -62,6 +62,31 @@ class SocketService(
         socket?.emit("player_action", data)
     }
 
+    private fun parseSeats(jsonArr: JSONArray?): List<com.pokernight.player.data.model.SeatInfo> {
+        if (jsonArr == null) return emptyList()
+        val seats = mutableListOf<com.pokernight.player.data.model.SeatInfo>()
+        for (i in 0 until jsonArr.length()) {
+            val s = jsonArr.getJSONObject(i)
+            seats.add(com.pokernight.player.data.model.SeatInfo(
+                seatIndex = s.optInt("seatIndex", i),
+                playerId = s.optString("playerId", ""),
+                nickname = s.optString("nickname", s.optString("name", "")),
+                chipCount = s.optInt("chipCount", s.optInt("chips", 0)),
+                currentBet = s.optInt("currentBet", 0),
+                status = s.optString("status", "empty"),
+                isDealer = s.optBoolean("isDealer", false),
+                isActing = s.optBoolean("isActing", false),
+                lastAction = s.optString("lastAction", ""),
+            ))
+        }
+        return seats
+    }
+
+    private fun findMySeat(seats: List<com.pokernight.player.data.model.SeatInfo>): com.pokernight.player.data.model.SeatInfo? {
+        val myId = com.pokernight.player.data.network.AuthManager.getPlayerId()
+        return seats.find { it.playerId == myId }
+    }
+
     private fun registerListeners() {
         val s = socket ?: return
 
@@ -86,6 +111,44 @@ class SocketService(
             }
         }
 
+        s.on("table_state") { args ->
+            if (args.isNotEmpty() && args[0] is JSONObject) {
+                val data = args[0] as JSONObject
+                val phase = data.optString("phase", "")
+                val displayCode = data.optString("displayCode", "")
+                val sb = data.optInt("sb", 10)
+                val bb = data.optInt("bb", 20)
+                val seats = parseSeats(data.optJSONArray("seats"))
+                val mySeat = findMySeat(seats)
+                currentState = currentState.copy(
+                    phase = phase,
+                    sb = sb,
+                    bb = bb,
+                    seats = if (seats.isNotEmpty()) seats else currentState.seats,
+                    mySeatIndex = mySeat?.seatIndex ?: currentState.mySeatIndex,
+                    myChips = mySeat?.chipCount ?: currentState.myChips,
+                    myCurrentBet = mySeat?.currentBet ?: 0,
+                )
+                onStateUpdate(currentState)
+            }
+        }
+
+        s.on("seat_joined") { args ->
+            if (args.isNotEmpty() && args[0] is JSONObject) {
+                val data = args[0] as JSONObject
+                val seats = parseSeats(data.optJSONArray("seats"))
+                val mySeat = findMySeat(seats)
+                if (seats.isNotEmpty()) {
+                    currentState = currentState.copy(
+                        seats = seats,
+                        mySeatIndex = mySeat?.seatIndex ?: currentState.mySeatIndex,
+                        myChips = mySeat?.chipCount ?: currentState.myChips,
+                    )
+                    onStateUpdate(currentState)
+                }
+            }
+        }
+
         s.on(EVT_TOURNAMENT_STARTED) { args ->
             val data = if (args.isNotEmpty() && args[0] is JSONObject) args[0] as JSONObject else JSONObject()
             currentState = currentState.copy(phase = "tournament_started")
@@ -107,18 +170,23 @@ class SocketService(
         s.on(EVT_HOLE_CARDS) { args ->
             if (args.isNotEmpty() && args[0] is JSONObject) {
                 val data = args[0] as JSONObject
-                val cardsArr = data.optJSONArray("cards") ?: JSONArray()
-                val cards = mutableListOf<Card>()
-                for (i in 0 until cardsArr.length()) {
-                    val c = cardsArr.getJSONObject(i)
-                    cards.add(Card(
-                        suit = c.optString("suit", ""),
-                        rank = c.optString("rank", ""),
-                        value = c.optInt("value", 0),
-                    ))
+                // Only update if these are MY cards
+                val cardPlayerId = data.optString("playerId", "")
+                val myPlayerId = com.pokernight.player.data.network.AuthManager.getPlayerId()
+                if (cardPlayerId.isEmpty() || cardPlayerId == myPlayerId) {
+                    val cardsArr = data.optJSONArray("cards") ?: JSONArray()
+                    val cards = mutableListOf<Card>()
+                    for (i in 0 until cardsArr.length()) {
+                        val c = cardsArr.getJSONObject(i)
+                        cards.add(Card(
+                            suit = c.optString("suit", ""),
+                            rank = c.optString("rank", ""),
+                            value = c.optInt("value", 0),
+                        ))
+                    }
+                    currentState = currentState.copy(holeCards = cards)
+                    onStateUpdate(currentState)
                 }
-                currentState = currentState.copy(holeCards = cards)
-                onStateUpdate(currentState)
             }
         }
 
@@ -130,13 +198,20 @@ class SocketService(
                 val pot = data.optInt("pot", 0)
                 val currentBet = data.optInt("currentBet", 0)
                 val actingIndex = data.optInt("actingIndex", -1)
+                // Parse seats from server event
+                val seats = parseSeats(data.optJSONArray("seats"))
+                val mySeat = findMySeat(seats)
                 currentState = currentState.copy(
                     phase = "hand_started",
                     handNumber = handNumber,
                     pot = pot,
                     currentBet = currentBet,
                     actingIndex = actingIndex,
-                    isMyTurn = actingIndex == currentState.mySeatIndex,
+                    seats = seats,
+                    mySeatIndex = mySeat?.seatIndex ?: currentState.mySeatIndex,
+                    myChips = mySeat?.chipCount ?: currentState.myChips,
+                    myCurrentBet = mySeat?.currentBet ?: 0,
+                    isMyTurn = actingIndex == (mySeat?.seatIndex ?: currentState.mySeatIndex),
                 )
                 onEvent(EVT_HAND_STARTED, data)
                 onStateUpdate(currentState)
@@ -148,6 +223,7 @@ class SocketService(
                 val data = args[0] as JSONObject
                 val stage = data.optString("stage", "")
                 val pot = data.optInt("pot", 0)
+                val currentBet = data.optInt("currentBet", 0)
                 val cardsArr = data.optJSONArray("communityCards") ?: JSONArray()
                 val cards = mutableListOf<Card>()
                 for (i in 0 until cardsArr.length()) {
@@ -158,10 +234,17 @@ class SocketService(
                         value = c.optInt("value", 0),
                     ))
                 }
+                // Update seats from stage_changed event
+                val seats = parseSeats(data.optJSONArray("seats"))
+                val mySeat = findMySeat(seats)
                 currentState = currentState.copy(
                     phase = "stage_changed:$stage",
                     pot = pot,
+                    currentBet = currentBet,
                     communityCards = cards,
+                    seats = if (seats.isNotEmpty()) seats else currentState.seats,
+                    myChips = mySeat?.chipCount ?: currentState.myChips,
+                    myCurrentBet = mySeat?.currentBet ?: currentState.myCurrentBet,
                 )
                 onEvent(EVT_STAGE_CHANGED, data)
                 onStateUpdate(currentState)
@@ -172,16 +255,22 @@ class SocketService(
             if (args.isNotEmpty() && args[0] is JSONObject) {
                 val data = args[0] as JSONObject
                 val actingIndex = data.optInt("actingIndex", -1)
-                val seats = currentState.seats.toMutableList()
-                if (actingIndex in seats.indices) {
-                    for (i in seats.indices) {
-                        seats[i] = seats[i].copy(isActing = i == actingIndex)
-                    }
+                val pot = data.optInt("pot", 0)
+                val currentBet = data.optInt("currentBet", 0)
+                val serverSeats = parseSeats(data.optJSONArray("seats"))
+                val mySeat = findMySeat(serverSeats)
+                val seats = if (serverSeats.isNotEmpty()) serverSeats.toMutableList() else currentState.seats.toMutableList()
+                for (i in seats.indices) {
+                    seats[i] = seats[i].copy(isActing = i == actingIndex)
                 }
                 currentState = currentState.copy(
                     actingIndex = actingIndex,
+                    pot = pot,
+                    currentBet = currentBet,
                     seats = seats,
-                    isMyTurn = actingIndex == currentState.mySeatIndex,
+                    myChips = mySeat?.chipCount ?: currentState.myChips,
+                    myCurrentBet = mySeat?.currentBet ?: currentState.myCurrentBet,
+                    isMyTurn = actingIndex == (mySeat?.seatIndex ?: currentState.mySeatIndex),
                 )
                 onStateUpdate(currentState)
             }
@@ -193,7 +282,12 @@ class SocketService(
                 val playerId = data.optString("playerId", "")
                 val action = data.optString("action", "")
                 val amount = data.optInt("amount", 0)
-                val seats = currentState.seats.toMutableList()
+                val pot = data.optInt("pot", data.optInt("pot", 0))
+                val currentBet = data.optInt("currentBet", currentState.currentBet)
+                // Update seats from server snapshot
+                val serverSeats = parseSeats(data.optJSONArray("seats"))
+                val mySeat = findMySeat(serverSeats)
+                val seats = if (serverSeats.isNotEmpty()) serverSeats.toMutableList() else currentState.seats.toMutableList()
                 for (i in seats.indices) {
                     if (seats[i].playerId == playerId) {
                         seats[i] = seats[i].copy(
@@ -202,7 +296,13 @@ class SocketService(
                         )
                     }
                 }
-                currentState = currentState.copy(seats = seats)
+                currentState = currentState.copy(
+                    seats = seats,
+                    pot = if (pot > 0) pot else currentState.pot,
+                    currentBet = currentBet,
+                    myChips = mySeat?.chipCount ?: currentState.myChips,
+                    myCurrentBet = mySeat?.currentBet ?: currentState.myCurrentBet,
+                )
                 onEvent(EVT_ACTION_RESULT, data)
                 onStateUpdate(currentState)
             }
@@ -219,10 +319,15 @@ class SocketService(
             if (args.isNotEmpty() && args[0] is JSONObject) {
                 val data = args[0] as JSONObject
                 val pot = data.optInt("pot", 0)
+                val seats = parseSeats(data.optJSONArray("seats"))
+                val mySeat = findMySeat(seats)
                 currentState = currentState.copy(
                     phase = "hand_result",
                     pot = 0,
                     currentBet = 0,
+                    seats = if (seats.isNotEmpty()) seats else currentState.seats,
+                    myChips = mySeat?.chipCount ?: currentState.myChips,
+                    myCurrentBet = 0,
                 )
                 onEvent(EVT_HAND_RESULT, data)
                 onStateUpdate(currentState)

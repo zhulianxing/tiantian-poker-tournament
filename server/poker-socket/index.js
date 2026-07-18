@@ -405,12 +405,13 @@ async function startTournament(tournamentId) {
     const room = `table:${tableCode}`;
 
     game.emit = async (event, data) => {
-      io.to(room).emit(event, data);
-      // 底牌只发给对应玩家
+      // hole_cards 只发给对应玩家，不广播给全房间
       if (event === 'hole_cards') {
         const playerSocket = [...io.sockets.sockets.values()]
           .find(s => s.player?.id === data.playerId);
         if (playerSocket) playerSocket.emit('hole_cards', data);
+      } else {
+        io.to(room).emit(event, data);
       }
       // 赛事结束时写回数据库
       if (event === 'tournament_finished') {

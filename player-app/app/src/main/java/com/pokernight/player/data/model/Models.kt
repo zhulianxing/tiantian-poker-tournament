@@ -112,6 +112,7 @@ data class SeatInfo(
     val playerId: String = "",
     val nickname: String = "",
     val chipCount: Int = 0,
+    val currentBet: Int = 0,
     val status: String = "empty",
     val isDealer: Boolean = false,
     val isActing: Boolean = false,

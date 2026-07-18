@@ -187,6 +187,11 @@ class GameViewModel : ViewModel() {
             try {
                 val result = api.joinTournament(tournamentId, "Bearer $token")
                 _joinResult.value = result.copy(tournamentId = tournamentId)
+                // Set mySeatIndex in gameState so the game screen knows which seat is mine
+                _gameState.value = _gameState.value.copy(
+                    mySeatIndex = result.seatIndex,
+                    myChips = if (result.chipCount > 0) result.chipCount else result.startChips,
+                )
                 _uiState.value = _uiState.value.copy(isLoading = false)
                 _toast.value = "入座成功！座位号: ${result.seatIndex}"
             } catch (e: retrofit2.HttpException) {
@@ -196,12 +201,17 @@ class GameViewModel : ViewModel() {
                 android.util.Log.d("GameVM", "joinTournament HttpException: code=${e.code()} body=$errorBody")
                 if (errorBody.contains("already joined") || errorBody.contains("already")) {
                     // Already joined — navigate to lobby anyway
+                    val mySeat = 0
                     _joinResult.value = JoinResponse(
                         success = true,
-                        seatIndex = 0,
+                        seatIndex = mySeat,
                         tournamentId = tournamentId,
                         chipCount = 1000,
                         startChips = 1000,
+                    )
+                    _gameState.value = _gameState.value.copy(
+                        mySeatIndex = mySeat,
+                        myChips = 1000,
                     )
                     _uiState.value = _uiState.value.copy(isLoading = false, error = null)
                 } else {

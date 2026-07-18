@@ -65,7 +65,7 @@ fun TableLobbyScreen(
     // Watch for tournament status change to "active" → navigate to game
     LaunchedEffect(tableStatus?.tournament?.status) {
         val status = tableStatus?.tournament?.status
-        if (status == "active" || status == "running") {
+        if (status == "active" || status == "running" || status == "started") {
             val code = tableStatus?.table?.code ?: ""
             onTournamentStart(code)
         }
