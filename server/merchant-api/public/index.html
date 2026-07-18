@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker Night 商户后台</title>
+<style>
+  /* ===== Reset & Base ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0a;
+    --card: #1a1a1a;
+    --card-hover: #222;
+    --text: #e0e0e0;
+    --text-muted: #888;
+    --gold: #FFD700;
+    --gold-dim: #b8a800;
+    --border: #333;
+    --green: #4caf50;
+    --red: #f44336;
+    --blue: #2196f3;
+    --radius: 8px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+  a { color: var(--gold); text-decoration: none; }
+
+  /* ===== Layout ===== */
+  .app-container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+  /* ===== Header ===== */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-logo {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+  .header-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .header-user .venue-name { color: var(--text-muted); }
+  .btn-logout {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+  .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+  /* ===== Tabs ===== */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .tab {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .tab:hover { border-color: var(--gold-dim); color: var(--text); }
+  .tab.active {
+    background: var(--gold);
+    color: #000;
+    border-color: var(--gold);
+    font-weight: 600;
+  }
+
+  /* ===== Cards ===== */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  /* ===== Stat Cards ===== */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--gold-dim); }
+  .stat-label { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--gold); }
+
+  /* ===== Forms ===== */
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block;
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .form-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 15px;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus { outline: none; border-color: var(--gold); }
+  .form-input::placeholder { color: #555; }
+  .form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .form-row .form-group { flex: 1; min-width: 180px; }
+
+  /* ===== Buttons ===== */
+  .btn {
+    background: var(--gold);
+    color: #000;
+    border: none;
+    padding: 10px 24px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-sm {
+    padding: 4px 12px;
+    font-size: 13px;
+    border-radius: 4px;
+  }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--gold); color: var(--gold); opacity: 1; }
+  .btn-danger {
+    background: transparent;
+    border: 1px solid var(--red);
+    color: var(--red);
+  }
+  .btn-danger:hover { background: var(--red); color: #fff; opacity: 1; }
+  .btn-green {
+    background: transparent;
+    border: 1px solid var(--green);
+    color: var(--green);
+  }
+  .btn-green:hover { background: var(--green); color: #fff; opacity: 1; }
+
+  /* ===== Tables ===== */
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th {
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 2px solid var(--border);
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tr:hover td { background: var(--card-hover); }
+  .empty-row td { text-align: center; color: var(--text-muted); padding: 40px; }
+
+  /* ===== Status Badges ===== */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-paid { background: rgba(76,175,80,0.15); color: var(--green); }
+  .badge-pending { background: rgba(255,215,0,0.15); color: var(--gold); }
+  .badge-refunded { background: rgba(244,67,54,0.15); color: var(--red); }
+  .badge-failed { background: rgba(244,67,54,0.15); color: var(--red); }
+  .badge-online { background: rgba(76,175,80,0.15); color: var(--green); }
+  .badge-offline { background: rgba(136,136,136,0.15); color: var(--text-muted); }
+
+  /* ===== Pagination ===== */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+  .page-info { font-size: 14px; color: var(--text-muted); }
+
+  /* ===== Login Page ===== */
+  .login-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  .login-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .login-title {
+    text-align: center;
+    font-size: 24px;
+    color: var(--gold);
+    margin-bottom: 28px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .login-box .form-input { font-size: 16px; }
+
+  /* ===== Toast ===== */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 24px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s, top 0.3s;
+    pointer-events: none;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.show { opacity: 1; top: 40px; }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+
+  /* ===== Loading Spinner ===== */
+  .loading-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(10,10,10,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+  }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== Section Title ===== */
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+  .section-title.gold { color: var(--gold); }
+
+  /* ===== Hidden ===== */
+  .hidden { display: none !important; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 640px) {
+    .app-container { padding: 10px; }
+    .header { flex-direction: column; align-items: flex-start; }
+    .header-user { width: 100%; justify-content: space-between; }
+    .tabs { overflow-x: auto; flex-wrap: nowrap; }
+    .tab { white-space: nowrap; padding: 8px 14px; font-size: 13px; }
+    .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-card { padding: 16px; }
+    .stat-value { font-size: 22px; }
+    .login-box { padding: 28px 20px; }
+    th, td { padding: 8px 10px; font-size: 13px; }
+    .form-row { flex-direction: column; }
+    .form-row .form-group { min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Toast ===== -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== Loading Overlay ===== -->
+<div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="spinner"></div>
+</div>
+
+<!-- ===== Login Page ===== -->
+<div id="loginPage" class="login-container">
+  <div class="login-box">
+    <div class="login-title">🃏 Poker Night 商户后台</div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label>手机号</label>
+        <input type="text" class="form-input" id="loginPhone" placeholder="请输入手机号" required>
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" class="form-input" id="loginPassword" placeholder="请输入密码" required>
+      </div>
+      <button type="submit" class="btn" style="width:100%;margin-top:8px;" id="loginBtn">登 录</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===== Main App ===== -->
+<div id="mainApp" class="app-container hidden">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-logo">🃏 Poker Night 商户后台</div>
+    <div class="header-user">
+      <span class="venue-name" id="venueNameDisplay"></span>
+      <button class="btn-logout" onclick="logout()">退出登录</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">概览</div>
+    <div class="tab" data-tab="devices" onclick="switchTab('devices')">设备管理</div>
+    <div class="tab" data-tab="orders" onclick="switchTab('orders')">订单管理</div>
+  </div>
+
+  <!-- ===== Dashboard Tab ===== -->
+  <div id="tab-dashboard" class="tab-content">
+    <div class="stat-grid" id="statGrid">
+      <div class="stat-card">
+        <div class="stat-label">今日订单</div>
+        <div class="stat-value" id="statTodayOrders">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">今日收入</div>
+        <div class="stat-value" id="statTodayRevenue">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">总订单数</div>
+        <div class="stat-value" id="statTotalOrders">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">总收入</div>
+        <div class="stat-value" id="statTotalRevenue">--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Devices Tab ===== -->
+  <div id="tab-devices" class="tab-content hidden">
+    <div class="card">
+      <div class="section-title gold">绑定新设备</div>
+      <form id="bindForm" onsubmit="bindDevice(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>设备 SN</label>
+            <input type="text" class="form-input" id="deviceSN" placeholder="输入设备序列号" required>
+          </div>
+          <div class="form-group">
+            <label>桌台名称</label>
+            <input type="text" class="form-input" id="tableName" placeholder="如：1号桌" required>
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end;">
+            <button type="submit" class="btn" id="bindBtn">绑定设备</button>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <div class="section-title">设备列表</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>设备 SN</th>
+              <th>桌台编号</th>
+              <th>桌台名称</th>
+              <th>绑定时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="deviceTableBody">
+            <tr class="empty-row"><td colspan="5">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Orders Tab ===== -->
+  <div id="tab-orders" class="tab-content hidden">
+    <div class="card">
+      <div class="section-title">订单列表</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>订单号</th>
+              <th>赛事编号</th>
+              <th>金额</th>
+              <th>状态</th>
+              <th>收入分成</th>
+              <th>时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="orderTableBody">
+            <tr class="empty-row"><td colspan="7">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="orderPagination">
+        <button class="btn btn-outline btn-sm" id="prevPageBtn" onclick="loadOrders(currentPage-1)">上一页</button>
+        <span class="page-info" id="pageInfo">第 1 页</span>
+        <button class="btn btn-outline btn-sm" id="nextPageBtn" onclick="loadOrders(currentPage+1)">下一页</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== State =====
+let token = localStorage.getItem('merchant_token') || '';
+let currentPage = 1;
+let totalPages = 1;
+const PAGE_SIZE = 20;
+const API_BASE = '/merchant/api/v1';
+
+// ===== Utils =====
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast ' + type, 3000);
+}
+
+function showLoading(show) {
+  document.getElementById('loadingOverlay').classList.toggle('hidden', !show);
+}
+
+function formatMoney(cents) {
+  if (cents === null || cents === undefined) return '¥0.00';
+  return '¥' + (cents / 100).toFixed(2);
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '--';
+  const d = new Date(dateStr);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function statusBadge(status) {
+  const map = {
+    paid: { cls: 'badge-paid', label: '已支付' },
+    pending: { cls: 'badge-pending', label: '待支付' },
+    refunded: { cls: 'badge-refunded', label: '已退款' },
+    failed: { cls: 'badge-failed', label: '失败' },
+    online: { cls: 'badge-online', label: '在线' },
+    offline: { cls: 'badge-offline', label: '离线' },
+  };
+  const s = map[status] || { cls: 'badge-pending', label: status };
+  return `<span class="badge ${s.cls}">${s.label}</span>`;
+}
+
+// ===== API =====
+async function api(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  try {
+    const res = await fetch(API_BASE + path, { ...options, headers });
+    // 401 → logout
+    if (res.status === 401) {
+      showToast('登录已过期，请重新登录', 'error');
+      logout();
+      return null;
+    }
+    const data = await res.json();
+    if (!res.ok || data.code !== undefined && data.code !== 0) {
+      throw new Error(data.message || data.error || `HTTP ${res.status}`);
+    }
+    return data;
+  } catch (err) {
+    // fetch network error or JSON parse error
+    if (err.message === 'Failed to fetch') {
+      showToast('网络错误，请检查连接', 'error');
+    }
+    throw err;
+  }
+}
+
+// ===== Auth =====
+function checkAuth() {
+  if (token) {
+    showMainApp();
+    switchTab('dashboard');
+  } else {
+    showLogin();
+  }
+}
+
+function showLogin() {
+  document.getElementById('loginPage').classList.remove('hidden');
+  document.getElementById('mainApp').classList.add('hidden');
+}
+
+function showMainApp() {
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+}
+
+function logout() {
+  token = '';
+  localStorage.removeItem('merchant_token');
+  showLogin();
+}
+
+// Login form
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const phone = document.getElementById('loginPhone').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = '登录中...';
+  try {
+    const res = await fetch(API_BASE + '/merchant/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, password }),
+    });
+    const data = await res.json();
+    if (!res.ok || (data.code !== undefined && data.code !== 0)) {
+      throw new Error(data.message || data.error || '登录失败');
+    }
+    token = data.data?.token || data.token;
+    localStorage.setItem('merchant_token', token);
+    showToast('登录成功', 'success');
+    showMainApp();
+    switchTab('dashboard');
+  } catch (err) {
+    showToast(err.message || '登录失败', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '登 录';
+  }
+});
+
+// ===== Tab Switching =====
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+  const panel = document.getElementById('tab-' + name);
+  if (panel) panel.classList.remove('hidden');
+  // Load data
+  if (name === 'dashboard') loadStats();
+  else if (name === 'devices') loadDevices();
+  else if (name === 'orders') { currentPage = 1; loadOrders(1); }
+}
+
+// ===== Dashboard =====
+async function loadStats() {
+  try {
+    const data = await api('/merchant/stats');
+    const stats = data.data || data;
+    document.getElementById('statTodayOrders').textContent = stats.today_orders ?? 0;
+    document.getElementById('statTodayRevenue').textContent = formatMoney(stats.today_revenue ?? 0);
+    document.getElementById('statTotalOrders').textContent = stats.total_orders ?? 0;
+    document.getElementById('statTotalRevenue').textContent = formatMoney(stats.total_revenue ?? 0);
+    // venue name
+    if (stats.venue_name) {
+      document.getElementById('venueNameDisplay').textContent = '🏠 ' + stats.venue_name;
+    }
+  } catch (err) {
+    showToast('加载统计数据失败: ' + err.message, 'error');
+  }
+}
+
+// ===== Devices =====
+async function loadDevices() {
+  const tbody = document.getElementById('deviceTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="5">加载中...</td></tr>';
+  try {
+    const data = await api('/merchant/devices');
+    const devices = data.data || data || [];
+    if (!Array.isArray(devices) || devices.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="5">暂无设备</td></tr>';
+      return;
+    }
+    tbody.innerHTML = devices.map(d => `
+      <tr>
+        <td>${d.device_sn || d.sn || '--'}</td>
+        <td>${d.table_number || d.table_no || '--'}</td>
+        <td>${d.table_name || '--'}</td>
+        <td>${formatDate(d.bind_time || d.bound_at || d.created_at)}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="unbindDevice('${d.device_sn || d.sn}')">解绑</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">加载失败</td></tr>';
+    showToast('加载设备列表失败: ' + err.message, 'error');
+  }
+}
+
+async function bindDevice(e) {
+  e.preventDefault();
+  const sn = document.getElementById('deviceSN').value.trim();
+  const tableName = document.getElementById('tableName').value.trim();
+  if (!sn || !tableName) return;
+  const btn = document.getElementById('bindBtn');
+  btn.disabled = true;
+  btn.textContent = '绑定中...';
+  try {
+    await api('/merchant/devices/bind', {
+      method: 'POST',
+      body: JSON.stringify({ device_sn: sn, table_name: tableName }),
+    });
+    showToast('设备绑定成功', 'success');
+    document.getElementById('deviceSN').value = '';
+    document.getElementById('tableName').value = '';
+    loadDevices();
+  } catch (err) {
+    showToast('绑定失败: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '绑定设备';
+  }
+}
+
+async function unbindDevice(sn) {
+  if (!confirm(`确定要解绑设备 ${sn} 吗？`)) return;
+  try {
+    await api('/merchant/devices/' + encodeURIComponent(sn), { method: 'DELETE' });
+    showToast('设备已解绑', 'success');
+    loadDevices();
+  } catch (err) {
+    showToast('解绑失败: ' + err.message, 'error');
+  }
+}
+
+// ===== Orders =====
+async function loadOrders(page) {
+  if (page < 1) page = 1;
+  currentPage = page;
+  const tbody = document.getElementById('orderTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="7">加载中...</td></tr>';
+  try {
+    const data = await api(`/merchant/orders?page=${page}&limit=${PAGE_SIZE}`);
+    const result = data.data || data;
+    const orders = result.list || result.orders || result || [];
+    const total = result.total || 0;
+    totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+
+    if (!Array.isArray(orders) || orders.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">暂无订单</td></tr>';
+    } else {
+      tbody.innerHTML = orders.map(o => `
+        <tr>
+          <td>${o.order_no || o.id || '--'}</td>
+          <td>${o.tournament_id || o.match_id || '--'}</td>
+          <td>${formatMoney(o.amount)}</td>
+          <td>${statusBadge(o.status)}</td>
+          <td>${formatMoney(o.merchant_share || o.revenue_share)}</td>
+          <td>${formatDate(o.created_at || o.created_time)}</td>
+          <td>${o.status === 'paid' ? `<button class="btn btn-danger btn-sm" onclick="refundOrder('${o.id || o.order_no}')">退款</button>` : '--'}</td>
+        </tr>
+      `).join('');
+    }
+    // pagination
+    document.getElementById('pageInfo').textContent = `第 ${page} / ${totalPages} 页（共 ${total} 条）`;
+    document.getElementById('prevPageBtn').disabled = page <= 1;
+    document.getElementById('nextPageBtn').disabled = page >= totalPages;
+  } catch (err) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">加载失败</td></tr>';
+    showToast('加载订单失败: ' + err.message, 'error');
+  }
+}
+
+async function refundOrder(orderId) {
+  if (!confirm(`确定要退款订单 ${orderId} 吗？此操作不可逆！`)) return;
+  try {
+    await api(`/merchant/orders/${encodeURIComponent(orderId)}/refund`, { method: 'POST' });
+    showToast('退款成功', 'success');
+    loadOrders(currentPage);
+  } catch (err) {
+    showToast('退款失败: ' + err.message, 'error');
+  }
+}
+
+// ===== Init =====
+checkAuth();
+</script>
+</body>
+</html>
