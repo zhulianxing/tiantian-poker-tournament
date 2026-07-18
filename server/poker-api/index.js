@@ -281,6 +281,7 @@ app.post('/api/v1/tournaments/:id/join', auth, async (req, res) => {
               tournamentId: tournament.id,
               playerId: req.player.id,
               nickname: req.player.nickname,
+              avatar: req.player.avatar || '🃏',
               seatIndex,
               chipCount: tournament.start_chips,
             }

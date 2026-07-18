@@ -76,8 +76,43 @@ io.on('connection', (socket) => {
           );
           players = playerResult.rows;
         }
-        socket.emit('table_state', { table, tournament, players });
-        console.log(`[Socket] Sent table_state to ${socket.id} for ${tableCode} (${players.length} players)`);
+        // 构造客户端期望的 table_state 格式
+        const phase = tournament ? (tournament.status === 'idle' ? 'idle' : tournament.status === 'registering' ? 'registering' : 'started') : 'idle';
+        const seats = [];
+        const maxPlayers = table.max_players || 6;
+        for (let i = 0; i < maxPlayers; i++) {
+          const p = players.find(pl => pl.seat_index === i);
+          if (p) {
+            seats.push({
+              seatIndex: i,
+              playerId: p.player_id,
+              nickname: p.nickname,
+              avatar: p.avatar || '🃏',
+              status: p.status,
+              chipCount: p.chip_count,
+              currentBet: 0,
+              isActing: false,
+              lastAction: '',
+            });
+          } else {
+            seats.push({ seatIndex: i, status: 'empty' });
+          }
+        }
+        socket.emit('table_state', {
+          phase,
+          seats,
+          displayCode: tournament?.display_code || '',
+          sb: tournament?.start_blind || 10,
+          bb: (tournament?.start_blind || 10) * 2,
+          blindLevel: 1,
+          pot: 0,
+          communityCards: [],
+          actingIndex: -1,
+          dealerIndex: 0,
+          handNumber: 0,
+          stage: '',
+        });
+        console.log(`[Socket] Sent table_state to ${socket.id} for ${tableCode} (phase=${phase}, ${players.length} players)`);
       }
     } catch (err) {
       console.error(`[Socket] Error sending table_state: ${err.message}`);
