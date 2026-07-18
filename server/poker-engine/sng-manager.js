@@ -519,6 +519,13 @@ class SNGManager {
       }
     }
 
+    // 恢复弃牌玩家为 playing（为下一手准备）
+    for (const p of this.players) {
+      if (p.status === PLAYER_STATUS.FOLDED) {
+        p.status = PLAYER_STATUS.PLAYING;
+      }
+    }
+
     // 移动庄家位
     this.dealerIndex = this.nextActiveSeat(this.dealerIndex);
 
