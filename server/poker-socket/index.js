@@ -98,19 +98,34 @@ io.on('connection', (socket) => {
             seats.push({ seatIndex: i, status: 'empty' });
           }
         }
+        // 检查是否有活跃的 SNG 游戏
+        const activeGame = [...activeGames.values()].find(g =>
+          g.tournament && g.tournament.table_id === table.id
+        );
+        const gameSeats = activeGame ? activeGame.getSeatsSnapshot() : null;
+        const gameHand = activeGame ? activeGame.handNumber : 0;
+        const gameBlind = activeGame ? activeGame.blindLevel : 1;
+        const gamePot = activeGame?.currentHand ? activeGame.currentHand.pot : 0;
+        const gameActing = activeGame?.currentHand ? activeGame.currentHand.actingIndex : -1;
+        const gameStage = activeGame?.currentHand ? activeGame.currentHand.stage : '';
+        const gameDealer = activeGame ? activeGame.dealerIndex : 0;
+
+        // 如果有活跃游戏，用游戏状态覆盖座位信息
+        const finalSeats = gameSeats || seats;
+
         socket.emit('table_state', {
           phase,
-          seats,
+          seats: finalSeats,
           displayCode: tournament?.display_code || '',
-          sb: tournament?.start_blind || 10,
-          bb: (tournament?.start_blind || 10) * 2,
-          blindLevel: 1,
-          pot: 0,
+          sb: tournament ? tournament.start_blind * Math.pow(2, gameBlind - 1) : 10,
+          bb: tournament ? tournament.start_blind * 2 * Math.pow(2, gameBlind - 1) : 20,
+          blindLevel: gameBlind,
+          pot: gamePot,
           communityCards: [],
-          actingIndex: -1,
-          dealerIndex: 0,
-          handNumber: 0,
-          stage: '',
+          actingIndex: gameActing,
+          dealerIndex: gameDealer,
+          handNumber: gameHand,
+          stage: gameStage,
         });
         console.log(`[Socket] Sent table_state to ${socket.id} for ${tableCode} (phase=${phase}, ${players.length} players)`);
       }
@@ -377,6 +392,7 @@ async function startTournament(tournamentId) {
       seatIndex: p.seat_index,
       chipCount: p.chip_count,
       status: p.status,
+      nickname: p.nickname,
     }));
 
     // 创建 SNG 管理器
@@ -387,13 +403,29 @@ async function startTournament(tournamentId) {
     const tableCode = tableResult.rows[0].code;
     const room = `table:${tableCode}`;
 
-    game.emit = (event, data) => {
+    game.emit = async (event, data) => {
       io.to(room).emit(event, data);
       // 底牌只发给对应玩家
       if (event === 'hole_cards') {
         const playerSocket = [...io.sockets.sockets.values()]
           .find(s => s.player?.id === data.playerId);
         if (playerSocket) playerSocket.emit('hole_cards', data);
+      }
+      // 赛事结束时写回数据库
+      if (event === 'tournament_finished') {
+        try {
+          const rankings = data.rankings || [];
+          for (const r of rankings) {
+            await query('UPDATE tournament_players SET chip_count = $1, final_rank = $2 WHERE tournament_id = $3 AND player_id = $4',
+              [r.chips || 0, r.rank, tournamentId, r.playerId]);
+          }
+          await query('UPDATE tournaments SET status = $1, finished_at = NOW() WHERE id = $2',
+            [TOURNAMENT_STATUS.FINISHED, tournamentId]);
+          console.log(`[Socket] Tournament ${tournament.display_code} finished, results saved`);
+          activeGames.delete(tournamentId);
+        } catch (e) {
+          console.error('[Socket] Failed to save tournament results:', e.message);
+        }
       }
     };
 
@@ -409,7 +441,8 @@ async function startTournament(tournamentId) {
     io.to(room).emit('tournament_started', {
       tournamentId,
       displayCode: tournament.display_code,
-      players: players.map(p => ({ id: p.id, seatIndex: p.seat_index, chips: p.chipCount })),
+      seats: game.getSeatsSnapshot(),
+      players: players.map(p => ({ id: p.id, seatIndex: p.seat_index, chips: p.chipCount, nickname: p.nickname })),
     });
 
     console.log(`[Socket] Tournament ${tournament.display_code} started`);

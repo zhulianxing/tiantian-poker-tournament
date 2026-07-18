@@ -159,6 +159,7 @@ class SNGManager {
       sbIndex,
       bbIndex,
       pot: this.currentHand.pot,
+      seats: this.getSeatsSnapshot(),
     });
 
     // 发送底牌给各玩家（点对点）
@@ -173,6 +174,10 @@ class SNGManager {
       pot: this.currentHand.pot,
       currentBet: bb,
       actingIndex,
+      seats: this.getSeatsSnapshot(),
+      dealerIndex: this.dealerIndex,
+      sbIndex,
+      bbIndex,
     });
 
     // 启动操作倒计时
@@ -281,6 +286,9 @@ class SNGManager {
       action,
       amount: result.amount,
       handNumber: hand.handNumber,
+      pot: hand.pot,
+      currentBet: hand.currentBet,
+      actingIndex: hand.actingIndex,
     });
 
     // 检查是否本轮下注结束
@@ -323,7 +331,7 @@ class SNGManager {
     }
 
     hand.actingIndex = nextIndex;
-    this.emit('turn_changed', { actingIndex: nextIndex, handNumber: hand.handNumber });
+    this.emit('turn_changed', { actingIndex: nextIndex, handNumber: hand.handNumber, seats: this.getSeatsSnapshot() });
 
     // 重置操作倒计时
     this.startActionTimer(nextIndex);
@@ -404,6 +412,7 @@ class SNGManager {
       communityCards: hand.revealedCommunity,
       pot: hand.pot,
       handNumber: hand.handNumber,
+      seats: this.getSeatsSnapshot(),
     });
 
     // 设置第一个行动者（庄家左边第一个活跃玩家）
@@ -411,7 +420,7 @@ class SNGManager {
     hand.actingIndex = firstActive;
     hand.lastRaiserIndex = firstActive; // 一开始没人加注
 
-    this.emit('turn_changed', { actingIndex: firstActive, handNumber: hand.handNumber });
+    this.emit('turn_changed', { actingIndex: firstActive, handNumber: hand.handNumber, seats: this.getSeatsSnapshot() });
 
     // 重置操作倒计时
     this.startActionTimer(firstActive);
@@ -508,6 +517,7 @@ class SNGManager {
         winnerId: winner.id,
         pot: hand.pot,
         showdown: false,
+        seats: this.getSeatsSnapshot(),
       });
     }
 
@@ -570,7 +580,24 @@ class SNGManager {
       ...eliminated.reverse().map((p, i) => ({ playerId: p.id, rank: i + 2, chips: 0 })),
     ];
 
-    this.emit('tournament_finished', { rankings });
+    this.emit('tournament_finished', { rankings, seats: this.getSeatsSnapshot() });
+  }
+
+  /**
+   * 获取当前座位快照（用于事件广播）
+   */
+  getSeatsSnapshot() {
+    return this.players.map(p => ({
+      seatIndex: p.seatIndex,
+      playerId: p.id,
+      nickname: p.nickname || p.id.substring(0, 8),
+      chipCount: p.chipCount,
+      status: p.status,
+      currentBet: this.currentHand && this.currentHand.actions ?
+        this.currentHand.actions
+          .filter(a => a.playerId === p.id)
+          .reduce((sum, a) => sum + (a.amount || 0), 0) : 0,
+    }));
   }
 
   /**
