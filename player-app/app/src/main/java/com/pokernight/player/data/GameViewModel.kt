@@ -189,6 +189,7 @@ class GameViewModel : ViewModel() {
                 _joinResult.value = result.copy(tournamentId = tournamentId)
                 // Set mySeatIndex in gameState so the game screen knows which seat is mine
                 _gameState.value = _gameState.value.copy(
+                    tournamentId = tournamentId,
                     mySeatIndex = result.seatIndex,
                     myChips = if (result.chipCount > 0) result.chipCount else result.startChips,
                 )
@@ -210,6 +211,7 @@ class GameViewModel : ViewModel() {
                         startChips = 1000,
                     )
                     _gameState.value = _gameState.value.copy(
+                        tournamentId = tournamentId,
                         mySeatIndex = mySeat,
                         myChips = 1000,
                     )

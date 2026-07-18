@@ -52,8 +52,10 @@ fun TableLobbyScreen(
     LaunchedEffect(tableCode) {
         if (tableCode.isNotEmpty()) {
             viewModel.fetchTableStatus(tableCode)
+            // Connect socket to receive real-time events while waiting
+            viewModel.connectSocket(tableCode)
         }
-        // Periodic refresh
+        // Periodic refresh as fallback
         while (true) {
             if (tableCode.isNotEmpty()) {
                 viewModel.fetchTableStatus(tableCode)
@@ -62,11 +64,12 @@ fun TableLobbyScreen(
         }
     }
 
-    // Watch for tournament status change to "active" → navigate to game
-    LaunchedEffect(tableStatus?.tournament?.status) {
+    // Navigate to game screen when tournament starts (via HTTP poll OR socket event)
+    LaunchedEffect(tableStatus?.tournament?.status, gameState.phase) {
         val status = tableStatus?.tournament?.status
-        if (status == "active" || status == "running" || status == "started") {
-            val code = tableStatus?.table?.code ?: ""
+        val phase = gameState.phase
+        if (status == "active" || status == "running" || status == "started" || phase == "tournament_started") {
+            val code = tableStatus?.table?.code ?: tableCode
             onTournamentStart(code)
         }
     }

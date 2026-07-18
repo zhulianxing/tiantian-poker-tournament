@@ -122,6 +122,7 @@ class SocketService(
                 val mySeat = findMySeat(seats)
                 currentState = currentState.copy(
                     phase = phase,
+                    tournamentId = data.optString("tournamentId", ""),
                     tableCode = displayCode,
                     sb = sb,
                     bb = bb,
