@@ -81,6 +81,7 @@ class SNGManager {
    * 开始新一手牌
    */
   startNewHand() {
+    if (this.isFinished) return;
     // 检查赛事是否结束
     const activePlayers = this.getActivePlayers();
     if (activePlayers.length <= 1) {
@@ -300,7 +301,9 @@ class SNGManager {
         break;
 
       case ACTIONS.CALL: {
-        const callAmount = Math.min(hand.currentBet, player.chipCount);
+        const alreadyBet = this.getSeatCurrentBet(player.seatIndex);
+        const toCall = Math.max(0, hand.currentBet - alreadyBet);
+        const callAmount = Math.min(toCall, player.chipCount);
         player.chipCount -= callAmount;
         hand.pot += callAmount;
         result.amount = callAmount;
@@ -428,25 +431,73 @@ class SNGManager {
     if (!player) return;
 
     this.actionTimer = setTimeout(() => {
-      // Bot auto-action: simple strategy
+      // Bot auto-action: smarter strategy
       if (player.isBot) {
         const hand = this.currentHand;
         if (!hand) return;
-        const toCall = Math.max(0, hand.currentBet - (this.getSeatCurrentBet(seatIndex) || 0));
+        const alreadyBet = this.getSeatCurrentBet(seatIndex);
+        const toCall = Math.max(0, hand.currentBet - alreadyBet);
+        const potOdds = toCall > 0 ? toCall / (hand.pot + toCall) : 0;
+        const chipRatio = player.chipCount / 1000; // 相对筹码
         
-        // Simple bot strategy: 
-        // - If can check (toCall === 0): check
-        // - If can afford call and pot odds reasonable: call (70%)
-        // - Otherwise: fold
+        // Bot 策略：
+        // - 可以 check → 80% check, 20% raise（偷池）
+        // - 需要跟注：根据底池赔率和筹码决定
+        //   - potOdds < 25% 且筹码充足 → 85% call, 15% raise
+        //   - potOdds 25-40% → 60% call, 5% raise, 35% fold
+        //   - potOdds > 40% → 20% call, 80% fold
+        // - 筹码 < 3BB → push or fold（短筹码策略）
+        const { bb } = this.getCurrentBlinds();
+        
         if (toCall === 0) {
-          console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} auto-check`);
-          this.handleAction(player.id, ACTIONS.CHECK);
-        } else if (player.chipCount >= toCall && Math.random() < 0.7) {
-          console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} auto-call ${toCall}`);
-          this.handleAction(player.id, ACTIONS.CALL, toCall);
+          if (Math.random() < 0.2 && player.chipCount > bb * 5) {
+            // 偷池 raise
+            const raiseAmt = Math.min(player.chipCount, bb * 3);
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} raise ${raiseAmt} (steal)`);
+            this.handleAction(player.id, ACTIONS.RAISE, raiseAmt);
+          } else {
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} check`);
+            this.handleAction(player.id, ACTIONS.CHECK);
+          }
+        } else if (player.chipCount < bb * 3) {
+          // 短筹码 push or fold
+          if (Math.random() < 0.5) {
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} all-in (short stack)`);
+            this.handleAction(player.id, ACTIONS.ALLIN);
+          } else {
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} fold (short stack)`);
+            this.handleAction(player.id, ACTIONS.FOLD);
+          }
+        } else if (potOdds < 0.25) {
+          if (Math.random() < 0.15) {
+            const raiseAmt = Math.min(player.chipCount, hand.currentBet * 2 + bb);
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} raise ${raiseAmt}`);
+            this.handleAction(player.id, ACTIONS.RAISE, raiseAmt);
+          } else {
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} call ${toCall}`);
+            this.handleAction(player.id, ACTIONS.CALL, toCall);
+          }
+        } else if (potOdds < 0.4) {
+          const r = Math.random();
+          if (r < 0.05) {
+            const raiseAmt = Math.min(player.chipCount, hand.currentBet * 2 + bb);
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} raise ${raiseAmt}`);
+            this.handleAction(player.id, ACTIONS.RAISE, raiseAmt);
+          } else if (r < 0.65) {
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} call ${toCall}`);
+            this.handleAction(player.id, ACTIONS.CALL, toCall);
+          } else {
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} fold`);
+            this.handleAction(player.id, ACTIONS.FOLD);
+          }
         } else {
-          console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} auto-fold`);
-          this.handleAction(player.id, ACTIONS.FOLD);
+          if (Math.random() < 0.2) {
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} call ${toCall} (expensive)`);
+            this.handleAction(player.id, ACTIONS.CALL, toCall);
+          } else {
+            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} fold (expensive)`);
+            this.handleAction(player.id, ACTIONS.FOLD);
+          }
         }
       } else {
         // Real player timeout: auto-fold
@@ -702,11 +753,22 @@ class SNGManager {
     const survivors = this.players.filter(p => p.status !== PLAYER_STATUS.ELIMINATED);
 
     const rankings = [
-      ...survivors.map(p => ({ playerId: p.id, rank: 1, chips: p.chipCount })),
-      ...eliminated.reverse().map((p, i) => ({ playerId: p.id, rank: i + 2, chips: 0 })),
+      ...survivors.map(p => ({ playerId: p.id, rank: 1, chips: p.chipCount, nickname: p.nickname })),
+      ...eliminated.reverse().map((p, i) => ({ playerId: p.id, rank: i + 2, chips: 0, nickname: p.nickname })),
     ];
 
-    this.emit('tournament_finished', { rankings, seats: this.getSeatsSnapshot() });
+    console.log(`[SNG] Tournament ${this.tournament.id} finished. Rankings:`);
+    rankings.forEach(r => console.log(`  #${r.rank}: ${r.nickname || r.playerId.substring(0,8)} (${r.chips} chips)`));
+
+    // 发送赛事结束事件，poker-socket 通过回调写回数据库
+    this.emit('tournament_finished', {
+      tournamentId: this.tournament.id,
+      rankings,
+      seats: this.getSeatsSnapshot(),
+    });
+
+    // 标记赛事已完成，防止重复 finish
+    this.isFinished = true;
   }
 
   /**
