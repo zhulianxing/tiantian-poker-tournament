@@ -391,9 +391,24 @@ class SNGManager {
       return;
     }
 
-    // 检查是否一轮下注完成（回到最后加注者）
-    if (nextIndex === hand.lastRaiserIndex) {
+    // 检查是否一轮下注完成
+    // 当前玩家就是 lastRaiserIndex（BB preflop check 后回到自己）→ 一轮完成
+    if (hand.actingIndex === hand.lastRaiserIndex) {
       this.advanceStage();
+      return;
+    }
+    // 下一个行动者回到 lastRaiserIndex → 检查该玩家是否已操作过
+    if (nextIndex === hand.lastRaiserIndex) {
+      const lastRaiserPlayer = this.players.find(p => p.seatIndex === hand.lastRaiserIndex);
+      const hasActed = lastRaiserPlayer && hand.actions.some(a => a.playerId === lastRaiserPlayer.id);
+      if (hasActed) {
+        this.advanceStage();
+        return;
+      }
+      // 还没操作过 → 让其操作
+      hand.actingIndex = nextIndex;
+      this.emit('turn_changed', { actingIndex: nextIndex, handNumber: hand.handNumber, pot: hand.pot, currentBet: hand.currentBet, seats: this.getSeatsSnapshot() });
+      this.startActionTimer(nextIndex);
       return;
     }
 
@@ -607,6 +622,7 @@ class SNGManager {
     if (winner) {
       // 单人获胜（其他人都弃牌了）
       winner.chipCount += hand.pot;
+      console.log(`[SNG] Hand #${hand.handNumber} finished: ${winner.nickname || winner.id.substring(0,8)} wins ${hand.pot} (fold)`);
       this.emit('hand_result', {
         handNumber: hand.handNumber,
         winnerId: winner.id,
@@ -620,6 +636,7 @@ class SNGManager {
     for (const p of this.players) {
       if (p.chipCount === 0 && p.status !== PLAYER_STATUS.ELIMINATED) {
         p.status = PLAYER_STATUS.ELIMINATED;
+        console.log(`[SNG] ${p.nickname || p.id.substring(0,8)} eliminated`);
         this.emit('player_eliminated', { playerId: p.id, handNumber: hand.handNumber });
       }
     }
