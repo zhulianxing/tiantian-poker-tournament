@@ -33,9 +33,9 @@ class SNGManager {
    * 启动赛事
    */
   start() {
-    // 所有等待中玩家改为 playing
+    // 所有非淘汰玩家改为 playing
     for (const p of this.players) {
-      if (p.status === 'waiting' || p.status === PLAYER_STATUS.WAITING) {
+      if (p.status !== PLAYER_STATUS.ELIMINATED && p.status !== PLAYER_STATUS.FOLDED) {
         p.status = PLAYER_STATUS.PLAYING;
       }
     }
@@ -213,6 +213,12 @@ class SNGManager {
     const actual = Math.min(amount, player.chipCount);
     player.chipCount -= actual;
     this.currentHand.pot += actual;
+    this.currentHand.actions.push({
+      playerId: player.id,
+      action: 'bet',
+      amount: actual,
+      success: true,
+    });
     if (player.chipCount === 0) {
       player.status = PLAYER_STATUS.ALLIN;
     }
@@ -345,6 +351,7 @@ class SNGManager {
       action,
       amount: result.amount,
       handNumber: hand.handNumber,
+      stage: hand.stage,
       pot: hand.pot,
       currentBet: hand.currentBet,
       actingIndex: hand.actingIndex,
@@ -391,7 +398,7 @@ class SNGManager {
     }
 
     hand.actingIndex = nextIndex;
-    this.emit('turn_changed', { actingIndex: nextIndex, handNumber: hand.handNumber, seats: this.getSeatsSnapshot() });
+    this.emit('turn_changed', { actingIndex: nextIndex, handNumber: hand.handNumber, pot: hand.pot, currentBet: hand.currentBet, seats: this.getSeatsSnapshot() });
 
     // 重置操作倒计时
     this.startActionTimer(nextIndex);
@@ -464,6 +471,8 @@ class SNGManager {
       stage: nextStage,
       communityCards: hand.revealedCommunity,
       pot: hand.pot,
+      currentBet: hand.currentBet,
+      actingIndex: hand.actingIndex,
       handNumber: hand.handNumber,
       seats: this.getSeatsSnapshot(),
     });
@@ -527,10 +536,11 @@ class SNGManager {
       } else break;
     }
 
-    // 分配底池
-    const winAmount = Math.floor(hand.pot / winners.length);
-    for (const w of winners) {
-      w.player.chipCount += winAmount;
+    // 分配底池（平局时余数分给排名最高的赢家）
+    const baseAmount = Math.floor(hand.pot / winners.length);
+    const remainder = hand.pot - baseAmount * winners.length;
+    for (let i = 0; i < winners.length; i++) {
+      winners[i].player.chipCount += baseAmount + (i < remainder ? 1 : 0);
     }
 
     this.emit('showdown', {
@@ -546,7 +556,7 @@ class SNGManager {
         cards: r.evaluation.cards,
       })),
       pot: hand.pot,
-      winAmount,
+      winAmount: baseAmount,
     });
 
     this.finishHand(null, winners);
@@ -590,7 +600,10 @@ class SNGManager {
     }
 
     // 移动庄家位
-    this.dealerIndex = this.nextActiveSeat(this.dealerIndex);
+    const nextDealer = this.nextActiveSeat(this.dealerIndex);
+    if (nextDealer !== -1) {
+      this.dealerIndex = nextDealer;
+    }
 
     // 检查赛事是否结束
     const activePlayers = this.getActivePlayers();

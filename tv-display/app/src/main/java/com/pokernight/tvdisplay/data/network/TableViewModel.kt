@@ -38,6 +38,11 @@ class TableViewModel : ViewModel() {
             return
         }
 
+        // Disconnect existing connection first to prevent memory leaks
+        if (_uiState.value.connected) {
+            socketService.disconnect()
+        }
+
         _isConnecting.value = true
         _connectionError.value = null
 
@@ -153,13 +158,17 @@ class TableViewModel : ViewModel() {
             ServerEvent.STAGE_CHANGED -> {
                 val stage = data.optString("stage", "")
                 val communityCards = parseCards(data.optJSONArray("communityCards"))
-                val pot = data.optInt("pot", 0)
+                val pot = data.optInt("pot", _uiState.value.pot)
+                val currentBet = data.optInt("currentBet", 0)
+                val actingIndex = data.optInt("actingIndex", -1)
                 val seats = parseSeats(data.optJSONArray("seats"))
                 _uiState.update {
                     it.copy(
                         stage = stage,
                         communityCards = communityCards,
                         pot = pot,
+                        currentBet = currentBet,
+                        actingIndex = actingIndex,
                         seats = seats.ifEmpty { it.seats },
                     )
                 }
@@ -167,10 +176,14 @@ class TableViewModel : ViewModel() {
 
             ServerEvent.TURN_CHANGED -> {
                 val actingIndex = data.optInt("actingIndex", -1)
+                val pot = data.optInt("pot", _uiState.value.pot)
+                val currentBet = data.optInt("currentBet", _uiState.value.currentBet)
                 val seats = parseSeats(data.optJSONArray("seats"))
                 _uiState.update {
                     it.copy(
                         actingIndex = actingIndex,
+                        pot = pot,
+                        currentBet = currentBet,
                         seats = seats.ifEmpty { it.seats },
                     )
                 }
@@ -197,15 +210,25 @@ class TableViewModel : ViewModel() {
                             seat.copy(isActing = isActing, lastAction = lastAction)
                         }
                     } else {
-                        // Fallback: local update
+                        // Fallback: local update — sync all seat fields
                         state.seats.map { seat ->
                             if (seat.playerId == playerId) {
+                                val newChipCount = when (action.lowercase()) {
+                                    "fold" -> seat.chipCount
+                                    "check" -> seat.chipCount
+                                    "call" -> seat.chipCount - amount
+                                    "raise", "bet" -> seat.chipCount - amount
+                                    "allin", "all-in", "all_in" -> 0
+                                    else -> seat.chipCount
+                                }
                                 seat.copy(
                                     lastAction = actionText,
                                     status = if (action == "fold") PlayerStatus.FOLDED
-                                        else if (action == "allin") PlayerStatus.ALL_IN
+                                        else if (action == "allin" || action == "all-in" || action == "all_in") PlayerStatus.ALL_IN
                                         else seat.status,
                                     isActing = false,
+                                    chipCount = maxOf(0, newChipCount),
+                                    currentBet = if (action.lowercase() in listOf("raise", "bet", "call")) amount else seat.currentBet,
                                 )
                             } else {
                                 seat.copy(isActing = seat.seatIndex == actingIndex)
