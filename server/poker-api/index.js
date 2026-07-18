@@ -271,7 +271,7 @@ app.post('/api/v1/tournaments/:id/join', auth, async (req, res) => {
     const tableCode = tableResult.rows[0]?.code;
     if (tableCode) {
       try {
-        await fetch(`http://localhost:${process.env.POKER_SOCKET_PORT || 3011}/internal/broadcast`, {
+        await fetch(`http://localhost:${process.env.POKER_SOCKET_PORT || 3001}/internal/broadcast`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -288,6 +288,20 @@ app.post('/api/v1/tournaments/:id/join', auth, async (req, res) => {
           })
         });
       } catch (e) { console.error('Failed to broadcast seat_joined:', e.message); }
+    }
+
+    // Check if table is full → auto-activate tournament
+    const updated = await client.query('SELECT player_count, max_players FROM tournaments WHERE id = $1', [tournament.id]);
+    const t = updated.rows[0];
+    if (t.player_count >= t.max_players) {
+      console.log('[API] Table full, activating tournament ' + tournament.id);
+      try {
+        await fetch('http://localhost:3001/internal/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tournamentId: tournament.id })
+        });
+      } catch (e) { console.error('Failed to activate:', e.message); }
     }
 
     res.json({ success: true, seatIndex, chipCount: tournament.start_chips });
@@ -339,7 +353,7 @@ app.post('/api/v1/tournaments/:id/leave', auth, async (req, res) => {
     const tableCode = tableResult.rows[0]?.code;
     if (tableCode) {
       try {
-        await fetch(`http://localhost:${process.env.POKER_SOCKET_PORT || 3011}/internal/broadcast`, {
+        await fetch(`http://localhost:${process.env.POKER_SOCKET_PORT || 3001}/internal/broadcast`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

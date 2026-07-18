@@ -115,6 +115,7 @@ io.on('connection', (socket) => {
 
         socket.emit('table_state', {
           phase,
+          tournamentId: tournament?.id || '',
           seats: finalSeats,
           displayCode: tournament?.display_code || '',
           sb: tournament ? tournament.start_blind * Math.pow(2, gameBlind - 1) : 10,
