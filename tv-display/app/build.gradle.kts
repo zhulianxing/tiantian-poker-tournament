@@ -1,27 +1,45 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+}
+
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) load(FileInputStream(f))
 }
 
 android {
     namespace = "com.pokernight.tvdisplay"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            keystoreProperties["storeFile"]?.let { storeFile = rootProject.file(it) }
+            storePassword = keystoreProperties["storePassword"] as String?
+            keyAlias = keystoreProperties["keyAlias"] as String?
+            keyPassword = keystoreProperties["keyPassword"] as String?
+        }
+    }
+
     defaultConfig {
         applicationId = "com.pokernight.tvdisplay"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

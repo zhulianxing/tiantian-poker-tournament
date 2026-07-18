@@ -127,9 +127,7 @@ class SNGManager {
     const bbIndex = this.nextActiveSeat(sbIndex);
     const actingIndex = this.nextActiveSeat(bbIndex);
 
-    this.collectBlind(sbIndex, sb);
-    this.collectBlind(bbIndex, bb);
-
+    // 先创建 currentHand，再收盲注（collectBlind 会修改 pot）
     this.currentHand = {
       handNumber: this.handNumber,
       deck,
@@ -137,13 +135,19 @@ class SNGManager {
       communityCards,
       revealedCommunity: [],
       stage: 'preflop', // preflop → flop → turn → river → showdown
-      pot: sb + bb,
+      pot: 0,
       currentBet: bb,
       minRaise: bb,
       actingIndex,
       lastRaiserIndex: bbIndex,
       actions: [],
     };
+
+    this.collectBlind(sbIndex, sb);
+    this.collectBlind(bbIndex, bb);
+
+    // pot 现在等于 sb + bb（由 collectBlind 累加）
+    // 如果 sb 玩家 all-in，pot 可能小于 sb+bb，保持实际值
 
     this.emit('new_hand', {
       handNumber: this.handNumber,

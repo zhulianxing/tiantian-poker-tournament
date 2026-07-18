@@ -188,7 +188,7 @@ app.post('/api/v1/payment/notify', async (req, res) => {
   const orderId = parseInt(xunhuOrderId.split('-')[1]);
 
   try {
-    const client = await db.connect();
+    const client = await db.getClient();
     await client.query('BEGIN');
 
     // 更新订单状态
@@ -259,7 +259,7 @@ app.post('/api/v1/refund', auth, async (req, res) => {
     );
 
     if (refundResult.data.errcode === 0) {
-      const client = await db.connect();
+      const client = await db.getClient();
       try {
         await client.query('BEGIN');
 

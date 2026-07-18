@@ -222,7 +222,7 @@ app.get('/api/v1/tables/:code/status', async (req, res) => {
 
 // 玩家免费入座
 app.post('/api/v1/tournaments/:id/join', auth, async (req, res) => {
-  const client = await db.connect();
+  const client = await db.getClient();
   try {
     await client.query('BEGIN');
 
@@ -290,7 +290,7 @@ app.post('/api/v1/tournaments/:id/join', auth, async (req, res) => {
 
 // 玩家离开座位
 app.post('/api/v1/tournaments/:id/leave', auth, async (req, res) => {
-  const client = await db.connect();
+  const client = await db.getClient();
   try {
     await client.query('BEGIN');
 

@@ -10,6 +10,7 @@ const { query } = require('@poker-night/shared');
 const { TOURNAMENT_STATUS, PLAYER_STATUS, ACTIONS, SNG_DEFAULTS } = require('@poker-night/shared');
 
 const app = express();
+app.use(express.json());
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
@@ -49,7 +50,9 @@ io.on('connection', (socket) => {
   console.log(`[Socket] Connected: ${socket.id} role=${socket.isTV ? 'tv' : 'player'}`);
 
   // 加入牌桌房间
-  socket.on('join_table', (tableCode) => {
+  socket.on('join_table', (data) => {
+    const tableCode = typeof data === 'string' ? data : data?.tableCode;
+    if (!tableCode) return;
     socket.join(`table:${tableCode}`);
     console.log(`[Socket] ${socket.id} joined table:${tableCode}`);
 
@@ -166,6 +169,21 @@ function handleReconnect(socket, tournamentId) {
 }
 
 // ============================================================
+// 内部 API（供 payment-svc 调用）
+// ============================================================
+app.post('/internal/activate', async (req, res) => {
+  try {
+    const { tournamentId } = req.body;
+    if (!tournamentId) return res.status(400).json({ error: 'missing tournamentId' });
+    await activateTournament(tournamentId);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[Socket] Activate error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================================
 // 赛事激活（由支付回调触发）
 // ============================================================
 async function activateTournament(tournamentId) {
@@ -209,6 +227,21 @@ function startWaitCountdown(tournamentId, duration, tableCode) {
   const timer = setInterval(async () => {
     remaining--;
     io.to(`table:${tableCode}`).emit('countdown_tick', { remaining });
+
+    // 满员立即开赛（每 tick 检查）
+    if (remaining % 5 === 0) {
+      try {
+        const checkResult = await query('SELECT player_count, max_players FROM tournaments WHERE id = $1', [tournamentId]);
+        const ct = checkResult.rows[0];
+        if (ct && ct.player_count >= ct.max_players) {
+          clearInterval(timer);
+          countdownTimers.delete(tournamentId);
+          io.to(`table:${tableCode}`).emit('countdown_tick', { remaining: 0, reason: 'table_full' });
+          await startTournament(tournamentId);
+          return;
+        }
+      } catch (e) { /* ignore tick check errors */ }
+    }
 
     if (remaining <= 0) {
       clearInterval(timer);
