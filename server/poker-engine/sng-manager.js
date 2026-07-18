@@ -417,7 +417,7 @@ class SNGManager {
       if (player.isBot) {
         const hand = this.currentHand;
         if (!hand) return;
-        const toCall = hand.currentBet - (this.getSeatCurrentBet(seatIndex) || 0);
+        const toCall = Math.max(0, hand.currentBet - (this.getSeatCurrentBet(seatIndex) || 0));
         
         // Simple bot strategy: 
         // - If can check (toCall === 0): check
@@ -482,6 +482,7 @@ class SNGManager {
     // 重置本轮下注
     hand.currentBet = 0;
     hand.lastRaiserIndex = -1;
+    hand.actions = []; // 清空上一轮的操作记录，让 getSeatsSnapshot 的 currentBet 只反映当前轮
 
     const nextStage = stages[currentIdx + 1];
     hand.stage = nextStage;
