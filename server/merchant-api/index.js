@@ -200,8 +200,8 @@ app.post('/api/v1/merchant/orders/:id/refund', merchantAuth, async (req, res) =>
     // 调用支付服务退款
     const axios = require('axios');
     const refundResult = await axios.post(
-      `http://localhost:${process.env.PAYMENT_PORT || 3012}/api/v1/refund`,
-      { orderId: parseInt(req.params.id), reason: reason || 'merchant refund' }
+      `http://localhost:${process.env.PAYMENT_PORT || 3002}/api/v1/refund`,
+      { orderId: req.params.id, reason: reason || 'merchant refund' }
     );
 
     if (refundResult.data.success) {
@@ -210,6 +210,94 @@ app.post('/api/v1/merchant/orders/:id/refund', merchantAuth, async (req, res) =>
     } else {
       res.status(500).json(refundResult.data);
     }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 订单导出（CSV）
+// ============================================================
+app.get('/api/v1/merchant/orders/export', merchantAuth, async (req, res) => {
+  try {
+    const { startDate, endDate, status } = req.query;
+    let whereClause = 'WHERE o.venue_id = $1';
+    const params = [req.merchant.venueId];
+    let paramIdx = 2;
+
+    if (startDate) { whereClause += ` AND o.created_at >= $${paramIdx++}`; params.push(startDate); }
+    if (endDate) { whereClause += ` AND o.created_at <= $${paramIdx++}`; params.push(endDate); }
+    if (status) { whereClause += ` AND o.status = $${paramIdx++}`; params.push(status); }
+
+    const result = await query(
+      `SELECT o.*, t.display_code, v.name as venue_name
+       FROM orders o
+       LEFT JOIN tournaments t ON o.tournament_id = t.id
+       LEFT JOIN venues v ON o.venue_id = v.id
+       ${whereClause}
+       ORDER BY o.created_at DESC`,
+      params
+    );
+
+    // 生成 CSV
+    const headers = ['订单ID', '赛事编号', '金额(元)', '平台分成(元)', '商户收入(元)', '状态', '支付时间', '创建时间'];
+    const rows = result.rows.map(o => [
+      o.id,
+      o.display_code || '-',
+      (o.amount / 100).toFixed(2),
+      (o.platform_fee / 100).toFixed(2),
+      (o.venue_income / 100).toFixed(2),
+      o.status,
+      o.paid_at ? new Date(o.paid_at).toLocaleString('zh-CN') : '-',
+      new Date(o.created_at).toLocaleString('zh-CN'),
+    ]);
+
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="orders-${new Date().toISOString().slice(0,10)}.csv"`);
+    res.send('\uFEFF' + csv); // BOM for Excel
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// 结算管理
+// ============================================================
+
+// 结算记录列表
+app.get('/api/v1/merchant/settlements', merchantAuth, async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT * FROM settlements WHERE venue_id = $1 ORDER BY period_end DESC LIMIT 50`,
+      [req.merchant.venueId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 申请提现
+app.post('/api/v1/merchant/settlements/:id/withdraw', merchantAuth, async (req, res) => {
+  try {
+    // 检查结算记录是否存在且属于该商户
+    const result = await query(
+      'SELECT * FROM settlements WHERE id = $1 AND venue_id = $2',
+      [req.params.id, req.merchant.venueId]
+    );
+    const settlement = result.rows[0];
+    if (!settlement) return res.status(404).json({ error: 'settlement not found' });
+    if (settlement.status !== 'pending') return res.status(400).json({ error: 'settlement not in pending state' });
+
+    // 标记为已申请提现（实际转账由平台线下操作）
+    await query(
+      'UPDATE settlements SET status = $1 WHERE id = $2',
+      ['confirmed', req.params.id]
+    );
+
+    res.json({ success: true, message: '提现已申请，平台将在 T+7 内对公转账' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
