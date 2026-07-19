@@ -113,7 +113,7 @@ app.post('/api/v1/payment/create', async (req, res) => {
       appid: XUNHU_APPID,
       trade_order_id: xunhuOrderId,
       total_fee: (amount / 100).toFixed(2), // 虎皮椒用元为单位
-      title: `德州扑克之夜 - ${table.label || table.code}`,
+      title: `天天扑克锦标赛 - ${table.label || table.code}`,
       time: String(Math.floor(Date.now() / 1000)),
       notify_url: notifyUrl,
       return_url: returnUrl,

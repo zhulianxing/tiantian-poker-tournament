@@ -49,13 +49,12 @@ module.exports = {
         DB_NAME: 'poker_night',
         DB_USER: 'poker',
         DB_PASSWORD: 'poker123',
-        PUBLIC_BASE_URL: 'http://43.164.130.145:3002',
-        PUBLIC_RETURN_URL: 'http://43.164.130.145',
-        // 虎皮椒配置（部署时填入实际值）
-        XUNHU_APP_ID: '',
-        XUNHU_APP_SECRET: '',
-        XUNHU_WX_URL: '',
-        XUNHU_ALIPAY_URL: '',
+        PUBLIC_BASE_URL: 'https://poker.clawclaw.tech',
+        PUBLIC_RETURN_URL: 'https://poker.clawclaw.tech',
+        // 虎皮椒配置
+        XUNHU_API: 'https://api.xunhupay.com/payment/do.html',
+        XUNHU_APPID: '201906182246',
+        XUNHU_APPKEY: '5995adfd45da21ea5a70c086df023c22',
       },
     },
     {
