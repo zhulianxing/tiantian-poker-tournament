@@ -1,204 +1,87 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>天天扑克锦标赛 — TV Display</title>
+<title>天天扑克锦标赛 — 酒吧 SNG 赛事平台</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; height:100vh; overflow:hidden; }
-.container { display:flex; flex-direction:column; height:100vh; }
-.top-bar { display:flex; justify-content:space-around; padding:12px 20px; background:#0D5C32; font-size:18px; }
-.top-bar span { color:#FFD700; font-weight:bold; }
-.table-area { flex:1; display:flex; align-items:center; justify-content:center; position:relative; }
-.seats-top, .seats-bottom { display:flex; gap:40px; justify-content:center; }
-.seat { background:#2a2a4a; border-radius:12px; padding:12px 20px; min-width:120px; text-align:center; border:2px solid #333; }
-.seat.active { border-color:#E53935; animation:pulse 1s infinite; }
-.seat.folded { opacity:0.4; }
-.seat.allin { border-color:#FFD700; }
-.seat.empty { color:#666; }
-.seat .nick { font-size:14px; margin-bottom:4px; }
-.seat .chips { font-size:18px; color:#4CAF50; font-weight:bold; }
-.seat .status { font-size:12px; margin-top:4px; color:#aaa; }
-.community { display:flex; gap:8px; margin:20px 0; }
-.card { width:60px; height:84px; background:#F5F5F0; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:bold; }
-.card.red { color:#E53935; }
-.card.black { color:#000; }
-.card.back { background:linear-gradient(135deg,#1a1a3e,#3a3a6e); color:#555; }
-.pot { text-align:center; font-size:24px; color:#FFD700; margin:10px 0; }
-.bottom-bar { display:flex; justify-content:center; gap:20px; padding:12px; background:#2a2a4a; }
-.bottom-bar button { background:#333; color:#fff; border:none; padding:8px 20px; border-radius:6px; cursor:pointer; font-size:14px; }
-.connect-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
-.connect-screen input { font-size:24px; padding:12px; text-align:center; width:200px; background:#2a2a4a; color:#FFD700; border:2px solid #FFD700; border-radius:8px; letter-spacing:4px; }
-.connect-screen button { margin-top:20px; font-size:20px; padding:12px 40px; background:#4CAF50; color:#fff; border:none; border-radius:8px; cursor:pointer; }
-@keyframes pulse { 0%,100%{border-color:#E53935;} 50%{border-color:#FF6666;} }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0a0a0f;color:#e8e8ec;min-height:100vh}
+.glow{position:fixed;top:-30%;left:50%;transform:translateX(-50%);width:900px;height:900px;background:radial-gradient(circle,rgba(13,90,50,.45),transparent 60%);pointer-events:none}
+.container{max-width:960px;margin:0 auto;padding:0 24px;position:relative}
+header{padding:64px 0 40px;text-align:center}
+.logo-badge{display:inline-flex;align-items:center;justify-content:center;width:84px;height:84px;background:linear-gradient(145deg,#1c1c26,#12121a);border:2px solid #c9a227;border-radius:22px;font-size:42px;color:#FFD700;margin-bottom:20px}
+h1{font-size:40px;font-weight:800;letter-spacing:2px;color:#FFD700}
+.tagline{margin-top:10px;font-size:15px;color:#9c9ca8;letter-spacing:1px}
+.en{margin-top:6px;font-size:11px;color:#c9a227;letter-spacing:4px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin:44px 0}
+.card{background:#16161f;border:1px solid #2a2a38;border-radius:18px;padding:26px}
+.card h3{font-size:17px;color:#FFD700;margin-bottom:8px}
+.card p{font-size:13px;color:#9c9ca8;line-height:1.7}
+.download{background:#14141d;border:1px solid #2a2a38;border-radius:22px;padding:36px;text-align:center;margin-bottom:44px}
+.download h2{font-size:22px;color:#fff;margin-bottom:6px}
+.download .sub{font-size:13px;color:#9c9ca8;margin-bottom:26px}
+.btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:16px 30px;border-radius:14px;font-size:16px;font-weight:700;text-decoration:none;transition:transform .15s,box-shadow .15s}
+.btn:active{transform:scale(.97)}
+.btn-gold{background:linear-gradient(135deg,#FFD700,#c9a227);color:#1a1400;box-shadow:0 6px 24px rgba(255,215,0,.25)}
+.btn-dark{background:#1c1c26;color:#FFD700;border:1px solid #c9a227}
+.btn .ver{display:block;font-size:11px;font-weight:400;opacity:.75;margin-top:2px}
+.btn-text{flex-direction:column;align-items:flex-start}
+.links{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
+.links a{color:#c9a227;text-decoration:none;font-size:13px;border:1px solid #2a2a38;border-radius:10px;padding:10px 18px;background:#12121a}
+.links a:hover{border-color:#c9a227}
+footer{text-align:center;padding:28px 0 40px;font-size:12px;color:#55555f}
+.steps{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:44px}
+.step{flex:1;min-width:150px;background:#12121a;border:1px solid #2a2a38;border-radius:14px;padding:18px;text-align:center}
+.step .num{display:inline-block;width:28px;height:28px;line-height:28px;border-radius:50%;background:#FFD700;color:#1a1400;font-weight:800;font-size:14px;margin-bottom:8px}
+.step p{font-size:13px;color:#9c9ca8}
 </style>
 </head>
 <body>
-<div id="app"></div>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script>
-const SERVER = window.location.origin;
-let socket = null;
-let tableCode = '';
+<div class="glow"></div>
+<div class="container">
+  <header>
+    <div class="logo-badge">♠</div>
+    <h1>天天扑克锦标赛</h1>
+    <div class="tagline">酒吧投币机式 SNG 赛事 · 扫码入座 · 自动开赛</div>
+    <div class="en">TIANTIAN POKER TOURNAMENT</div>
+  </header>
 
-function renderConnect() {
-  document.getElementById('app').innerHTML = `
-    <div class="connect-screen">
-      <h1 style="color:#FFD700;font-size:48px;margin-bottom:40px;">🃏 天天扑克锦标赛</h1>
-      <p style="color:#aaa;margin-bottom:20px;">输入桌号连接牌桌</p>
-      <input id="codeInput" maxlength="6" placeholder="PNDEMO" value="" />
-      <button onclick="connect()">连接</button>
-      <p style="color:#666;margin-top:30px;font-size:14px;">测试桌号: PNDEMO</p>
+  <div class="download" id="download">
+    <h2>下载 APP</h2>
+    <div class="sub">TV 显示屏装在酒吧电视/盒子上，玩家 APP 装在手机上</div>
+    <div class="btns">
+      <a class="btn btn-gold btn-text" href="/download/tv-display-v1.1.0.apk">
+        📺 TV 显示屏
+        <span class="ver">v1.1.0 · Android TV / 盒子</span>
+      </a>
+      <a class="btn btn-dark btn-text" href="/download/player-app-v1.1.0.apk">
+        📱 玩家 APP
+        <span class="ver">v1.1.0 · Android 7.0+</span>
+      </a>
     </div>
-  `;
-  document.getElementById('codeInput').focus();
-  document.getElementById('codeInput').addEventListener('keypress', e => {
-    if (e.key === 'Enter') connect();
-  });
-}
+  </div>
 
-function connect() {
-  tableCode = document.getElementById('codeInput').value.toUpperCase();
-  if (!tableCode) return;
-  
-  socket = io(SERVER, { path: '/socket.io/' });
-  socket.on('connect', () => {
-    socket.emit('join_table', tableCode);
-    renderTable();
-  });
-  socket.on('disconnect', () => {
-    document.getElementById('app').innerHTML = '<div class="connect-screen"><h1 style="color:#E53935;">已断线，重连中...</h1></div>';
-  });
-  
-  // 事件处理
-  socket.on('tournament_activated', (d) => updateStatus('等待玩家入座...', d));
-  socket.on('countdown_tick', (d) => updateCountdown(d.remaining));
-  socket.on('tournament_started', (d) => updateStatus('比赛开始!', d));
-  socket.on('new_hand', (d) => updateStatus(`第 ${d.handNumber} 手`, d));
-  socket.on('hand_started', (d) => { updateStatus(`第 ${d.handNumber} 手 - ${d.stage}`, d); updatePot(d.pot); });
-  socket.on('stage_changed', (d) => { updateStage(d); });
-  socket.on('turn_changed', (d) => { updateActing(d.actingIndex); });
-  socket.on('action_result', (d) => { updateAction(d); });
-  socket.on('showdown', (d) => { updateShowdown(d); });
-  socket.on('hand_result', (d) => { updateStatus(`第 ${d.handNumber} 手结束 - 赢家获得 ${d.pot}`, d); });
-  socket.on('blind_level_up', (d) => { updateBlinds(d); });
-  socket.on('tournament_finished', (d) => { updateStatus('比赛结束', d); });
-}
+  <div class="steps">
+    <div class="step"><div class="num">1</div><p>TV 装显示屏 APP，绑定桌号</p></div>
+    <div class="step"><div class="num">2</div><p>顾客扫码支付发起费</p></div>
+    <div class="step"><div class="num">3</div><p>满员自动开赛，TV 全程直播</p></div>
+    <div class="step"><div class="num">4</div><p>流水 70% 周结给店家</p></div>
+  </div>
 
-function renderTable() {
-  document.getElementById('app').innerHTML = `
-    <div class="container">
-      <div class="top-bar">
-        <span>桌号: <span id="code">${tableCode}</span></span>
-        <span>盲注: <span id="blinds">10/20</span></span>
-        <span>级别: <span id="level">1</span></span>
-        <span>奖池: <span id="pot">0</span></span>
-        <span>倒计时: <span id="countdown">--</span></span>
-      </div>
-      <div class="table-area">
-        <div>
-          <div class="seats-top" id="seatsTop"></div>
-          <div class="community" id="community"></div>
-          <div class="pot" id="potDisplay">底池: 0</div>
-          <div class="seats-bottom" id="seatsBottom"></div>
-        </div>
-      </div>
-      <div class="bottom-bar">
-        <button onclick="location.reload()">断开</button>
-        <span id="statusText" style="color:#aaa;align-self:center;">等待连接...</span>
-      </div>
-    </div>
-  `;
-  renderSeats();
-}
+  <div class="cards">
+    <div class="card"><h3>♠ 投币机式 SNG</h3><p>扫码付发起费即激活牌桌，满员自动开赛。无需店员组织，一台电视就是一间扑克室。</p></div>
+    <div class="card"><h3>📺 电视直播级画面</h3><p>深色高级感牌桌、金色底池徽章、行动玩家金框提示，大屏观感对标 WSOP 转播。</p></div>
+    <div class="card"><h3>💰 双通道收款</h3><p>微信 / 支付宝（虎皮椒）+ USDT（币安 BSC 链），店家流水 70% 每周结算。</p></div>
+  </div>
 
-function renderSeats(players = []) {
-  const seatsTop = document.getElementById('seatsTop');
-  const seatsBottom = document.getElementById('seatsBottom');
-  if (!seatsTop) return;
-  
-  const seats = [];
-  for (let i = 0; i < 6; i++) {
-    const p = players.find(x => x.seatIndex === i);
-    seats.push(p || { seatIndex: i, nickname: '空座', chipCount: 0, status: 'empty' });
-  }
-  
-  seatsTop.innerHTML = seats.slice(0, 3).map(s => seatHTML(s)).join('');
-  seatsBottom.innerHTML = seats.slice(3, 6).reverse().map(s => seatHTML(s)).join('');
-}
+  <div class="links">
+    <a href="/tv.html">🖥 网页版观战</a>
+    <a href="/merchant/login.html">🏪 商户后台</a>
+  </div>
 
-function seatHTML(s) {
-  let cls = 'seat';
-  if (s.status === 'folded') cls += ' folded';
-  if (s.status === 'allin' || s.status === 'allIn') cls += ' allin';
-  if (s.status === 'empty') cls += ' empty';
-  const statusText = {waiting:'等待',playing:'坐席中',folded:'弃牌',allin:'All-In',allIn:'All-In',eliminated:'淘汰',empty:'空座'}[s.status] || s.status;
-  return `<div class="${cls}" id="seat-${s.seatIndex}">
-    <div class="nick">${s.nickname || '空座'}</div>
-    <div class="chips">${s.chipCount || 0}</div>
-    <div class="status">${statusText}</div>
-  </div>`;
-}
-
-function updateStatus(text, data) {
-  const el = document.getElementById('statusText');
-  if (el) el.textContent = text;
-}
-function updateCountdown(sec) {
-  const el = document.getElementById('countdown');
-  if (el) {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    el.textContent = `${m}:${s.toString().padStart(2,'0')}`;
-  }
-}
-function updatePot(pot) {
-  const el = document.getElementById('potDisplay');
-  if (el) el.textContent = `底池: ${pot}`;
-  const el2 = document.getElementById('pot');
-  if (el2) el2.textContent = pot;
-}
-function updateBlinds(d) {
-  const el = document.getElementById('blinds');
-  if (el) el.textContent = `${d.sb}/${d.bb}`;
-  const el2 = document.getElementById('level');
-  if (el2) el2.textContent = d.level;
-}
-function updateStage(d) {
-  const stageNames = { preflop:'翻牌前', flop:'翻牌', turn:'转牌', river:'河牌', showdown:'摊牌' };
-  updateStatus(stageNames[d.stage] || d.stage, d);
-  updatePot(d.pot);
-  if (d.communityCards) {
-    const el = document.getElementById('community');
-    if (el) {
-      el.innerHTML = d.communityCards.map(c => {
-        const red = c.suit === '♥' || c.suit === '♦';
-        return `<div class="card ${red?'red':'black'}">${c.rank}${c.suit}</div>`;
-      }).join('');
-    }
-  }
-}
-function updateActing(idx) {
-  document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
-  if (idx >= 0) {
-    const el = document.getElementById(`seat-${idx}`);
-    if (el) el.classList.add('active');
-  }
-}
-function updateAction(d) {
-  const el = document.getElementById(`seat-${d.seatIndex || 0}`);
-  // Could show action text
-}
-function updateShowdown(d) {
-  if (d.winners && d.winners.length > 0) {
-    const w = d.winners[0];
-    updateStatus(`🎉 ${w.playerId || '玩家'} 赢得 ${d.pot}! (${w.handName || ''})`, d);
-  }
-}
-
-// 启动
-renderConnect();
-</script>
+  <footer>© 2026 天天扑克锦标赛 · poker.clawclaw.tech</footer>
+</div>
 </body>
 </html>

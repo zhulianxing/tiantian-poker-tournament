@@ -13,7 +13,7 @@ class SocketService {
 
     companion object {
         private const val TAG = "SocketService"
-        private const val WS_URL = "wss://pokernight.cc/socket.io/?EIO=4&transport=websocket&role=tv"
+        private const val WS_URL = "wss://poker.clawclaw.tech/socket.io/?EIO=4&transport=websocket&role=tv"
         private const val EIO_OPEN = '0'
         private const val EIO_CLOSE = '1'
         private const val EIO_PING = '2'

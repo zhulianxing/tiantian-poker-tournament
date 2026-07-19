@@ -44,7 +44,7 @@ fun ConnectScreen(
 
     // Generate QR code for Player App download
     LaunchedEffect(Unit) {
-        qrBitmap = generateQrCode("https://pokernight.cc/download")
+        qrBitmap = generateQrCode("https://poker.clawclaw.tech/download")
     }
 
     Box(
