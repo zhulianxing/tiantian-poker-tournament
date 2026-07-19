@@ -1,5 +1,5 @@
 /* ============================================
-   Poker Night Merchant Dashboard - App Logic
+   天天扑克锦标赛 Merchant Dashboard - App Logic
    ============================================ */
 
 (function () {

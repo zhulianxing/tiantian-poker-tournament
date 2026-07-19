@@ -63,7 +63,7 @@ fun TableListScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "♠ Poker Night",
+                    text = "♠ 天天扑克锦标赛",
                     fontSize = 24.sp,
                     color = Gold,
                     fontWeight = FontWeight.Bold,

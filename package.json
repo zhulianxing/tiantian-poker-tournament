@@ -1,7 +1,7 @@
 {
-  "name": "poker-night",
+  "name": "tiantian-poker-tournament",
   "version": "1.0.0",
-  "description": "德州扑克之夜 — 酒吧投币机式 SNG 赛事平台",
+  "description": "天天扑克锦标赛 — 酒吧投币机式 SNG 赛事平台",
   "private": true,
   "workspaces": [
     "server/shared",

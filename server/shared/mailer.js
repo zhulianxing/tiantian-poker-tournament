@@ -38,8 +38,8 @@ function getTransporter() {
  */
 async function sendCode(email, code, purpose) {
   const isDev = process.env.NODE_ENV === 'development' || !process.env.SMTP_PASS;
-  const subject = purpose === 'register' ? '🎮 Poker Night 注册验证码' : '🔑 Poker Night 登录验证码';
-  const text = `您的验证码是: ${code}\n\n验证码10分钟内有效。\n\n如果不是您本人操作，请忽略此邮件。\n\n— Poker Night Team`;
+  const subject = purpose === 'register' ? '🎮 天天扑克锦标赛 注册验证码' : '🔑 天天扑克锦标赛 登录验证码';
+  const text = `您的验证码是: ${code}\n\n验证码10分钟内有效。\n\n如果不是您本人操作，请忽略此邮件。\n\n— 天天扑克锦标赛 Team`;
 
   if (isDev) {
     console.log(`\n[DEV] ═══════════════════════════════════════`);
@@ -58,7 +58,7 @@ async function sendCode(email, code, purpose) {
   }
 
   await t.sendMail({
-    from: `"Poker Night" <${process.env.SMTP_USER || 'zhulianxing@139.me'}>`,
+    from: `"天天扑克锦标赛" <${process.env.SMTP_USER || 'zhulianxing@139.me'}>`,
     to: email,
     subject,
     text,

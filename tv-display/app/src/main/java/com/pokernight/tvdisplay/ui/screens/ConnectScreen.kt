@@ -64,7 +64,7 @@ fun ConnectScreen(
         ) {
             // Title
             Text(
-                text = "♠ Poker Night ♠",
+                text = "♠ 天天扑克锦标赛 ♠",
                 color = GoldAccent,
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
@@ -186,7 +186,7 @@ fun ConnectScreen(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "Scan the QR code with your phone to download the Poker Night Player App and join the table.",
+                        text = "Scan the QR code with your phone to download the 天天扑克锦标赛 Player App and join the table.",
                         color = TextSecondary,
                         fontSize = 13.sp,
                     )

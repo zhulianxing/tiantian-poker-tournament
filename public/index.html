@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Poker Night — TV Display</title>
+<title>天天扑克锦标赛 — TV Display</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; height:100vh; overflow:hidden; }
@@ -45,7 +45,7 @@ let tableCode = '';
 function renderConnect() {
   document.getElementById('app').innerHTML = `
     <div class="connect-screen">
-      <h1 style="color:#FFD700;font-size:48px;margin-bottom:40px;">🃏 Poker Night</h1>
+      <h1 style="color:#FFD700;font-size:48px;margin-bottom:40px;">🃏 天天扑克锦标赛</h1>
       <p style="color:#aaa;margin-bottom:20px;">输入桌号连接牌桌</p>
       <input id="codeInput" maxlength="6" placeholder="PNDEMO" value="" />
       <button onclick="connect()">连接</button>

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Poker Night</string>
+    <string name="app_name">天天扑克锦标赛</string>
     <string name="login">登录</string>
     <string name="register">注册</string>
     <string name="phone">手机号</string>

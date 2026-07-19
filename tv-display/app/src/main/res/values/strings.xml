@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Poker Night TV</string>
-    <string name="connect_title">Poker Night</string>
+    <string name="app_name">天天扑克锦标赛 TV</string>
+    <string name="connect_title">天天扑克锦标赛</string>
     <string name="connect_subtitle">Connect your table display</string>
     <string name="enter_table_code">Enter Table Code</string>
     <string name="table_code_hint">6-character code</string>

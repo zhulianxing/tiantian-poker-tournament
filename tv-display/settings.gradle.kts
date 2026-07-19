@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TVDisplay"
+rootProject.name = "TiantianPokerTV"
 include(":app")

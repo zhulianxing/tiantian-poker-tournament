@@ -69,7 +69,7 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                text = "♠ Poker Night ♠",
+                text = "♠ 天天扑克锦标赛 ♠",
                 fontSize = 32.sp,
                 color = Gold,
                 fontWeight = FontWeight.Bold,

@@ -96,7 +96,7 @@ fun IdleScreen(
         ) {
             // === Header ===
             Text(
-                text = "♠ Poker Night ♠",
+                text = "♠ 天天扑克锦标赛 ♠",
                 color = GoldAccent,
                 fontSize = 42.sp,
                 fontWeight = FontWeight.Bold,
@@ -122,7 +122,7 @@ fun IdleScreen(
                 QrCodeCard(
                     url = downloadUrl,
                     title = "下载选手 APP",
-                    description = "扫码下载 Poker Night 选手端 APP",
+                    description = "扫码下载天天扑克锦标赛选手端 APP",
                     qrSize = 180,
                 )
 

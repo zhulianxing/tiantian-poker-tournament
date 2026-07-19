@@ -49,7 +49,7 @@ fun SplashScreen(
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                text = "Poker Night",
+                text = "天天扑克锦标赛",
                 fontSize = 36.sp,
                 color = Gold,
                 fontWeight = FontWeight.Bold,

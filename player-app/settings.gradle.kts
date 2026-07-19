@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PlayerApp"
+rootProject.name = "TiantianPokerPlayer"
 include(":app")

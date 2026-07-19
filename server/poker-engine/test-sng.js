@@ -87,7 +87,7 @@ function setupActionMgr(playerCount, handOverrides = {}) {
 
 // ======================= Tests =======================
 console.log('╔══════════════════════════════════════╗');
-console.log('║   Poker Night SNG Engine Tests      ║');
+console.log('║   天天扑克锦标赛 SNG Engine Tests   ║');
 console.log('╚══════════════════════════════════════╝\n');
 
 // --- Deck Core ---
@@ -534,7 +534,7 @@ async function finalize() {
   const passed = results.passed;
   const failed = results.failed;
 
-  let report = `# Poker Night SNG 引擎单元测试报告
+  let report = `# 天天扑克锦标赛 SNG 引擎单元测试报告
 
 **测试时间**: ${now}
 **测试文件**: \`server/poker-engine/test-sng.js\`
