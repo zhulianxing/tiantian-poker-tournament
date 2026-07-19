@@ -14,7 +14,7 @@ function getTransporter() {
   if (!nodemailer) return null;
   if (transporter) return transporter;
 
-  const user = process.env.SMTP_USER || 'zhulianxing@139.me';
+  const user = process.env.SMTP_USER || 'sms@139.me';
   const pass = process.env.SMTP_PASS || '';
 
   if (!pass) {
@@ -23,9 +23,9 @@ function getTransporter() {
   }
 
   transporter = nodemailer.createTransport({
-    host: 'smtp.qq.com',
-    port: 465,
-    secure: true,
+    host: process.env.SMTP_HOST || 'smtp.exmail.qq.com',
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: process.env.SMTP_SECURE !== 'false',
     auth: { user, pass },
   });
 
@@ -58,7 +58,7 @@ async function sendCode(email, code, purpose) {
   }
 
   await t.sendMail({
-    from: `"天天扑克锦标赛" <${process.env.SMTP_USER || 'zhulianxing@139.me'}>`,
+    from: process.env.SMTP_FROM || `"天天扑克锦标赛" <${process.env.SMTP_USER || 'sms@139.me'}>`,
     to: email,
     subject,
     text,
