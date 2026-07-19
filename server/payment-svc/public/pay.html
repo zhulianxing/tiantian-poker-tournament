@@ -25,6 +25,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .pay-btn:disabled{opacity:0.5;cursor:not-allowed}
 .btn-wechat{background:#07c160;color:#fff}
 .btn-alipay{background:#1677ff;color:#fff}
+.btn-usdt{background:linear-gradient(135deg,#c9a227,#8a7218);color:#fff}
 .loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:999}
 .loading-overlay.show{display:flex}
 .spinner{width:36px;height:36px;border:3px solid #333;border-top-color:#FFD700;border-radius:50%;animation:spin .8s linear infinite}
@@ -54,6 +55,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <div class="pay-methods" id="payMethods" style="display:none">
       <button class="pay-btn btn-wechat" id="btnWechat" onclick="createPayment('wechat')">微信支付</button>
       <button class="pay-btn btn-alipay" id="btnAlipay" onclick="createPayment('alipay')">支付宝</button>
+      <button class="pay-btn btn-usdt" id="btnUsdt" onclick="createPayment('usdt')">₮ USDT（泰达币）</button>
     </div>
     <div id="loadingInfo" style="text-align:center;color:#888;font-size:14px;padding:40px 0">正在加载牌桌信息…</div>
   </div>

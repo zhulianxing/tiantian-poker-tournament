@@ -20,6 +20,10 @@ const XUNHU_APPID = process.env.XUNHU_APPID || '201906182246';
 const XUNHU_APPKEY = process.env.XUNHU_APPKEY || '5995adfd45da21ea5a70c086df023c22';
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://pokernight.cc';
 
+// USDT 通道配置（币安 BSC 自动收款网关）
+const CLAWPAY_API = process.env.CLAWPAY_API || 'https://pay.clawclaw.tech/api/index.php';
+const USDT_CNY_RATE = parseFloat(process.env.USDT_CNY_RATE || '7.2'); // 人民币兑美元汇率
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // 虎皮椒回调是 form-urlencoded
@@ -102,9 +106,62 @@ app.post('/api/v1/payment/create', async (req, res) => {
       [tournamentId, tableId, table.venue_id, amount, platformFee, venueIncome]
     );
     const orderId = orderResult.rows[0].id;
+    const tradeOrderId = `PN-${orderId}-${Date.now()}`;
 
+    // ==================== USDT 通道 ====================
+    if (paymentMethod === 'usdt') {
+      const usdtAmount = Math.max(Math.round((amount / 100 / USDT_CNY_RATE) * 100) / 100, 0.01);
+      const callbackUrl = `${PUBLIC_BASE_URL}/pay/api/v1/payment/usdt-notify`;
+
+      console.log('[Payment] Creating USDT order:', tradeOrderId, 'amount:', usdtAmount, 'USDT');
+
+      let clawData;
+      try {
+        const clawResult = await axios.post(
+          `${CLAWPAY_API}?action=create_order`,
+          {
+            amount: usdtAmount,
+            order_no: tradeOrderId,
+            product_name: `天天扑克锦标赛 - ${table.label || table.code}`,
+            callback_url: callbackUrl,
+          },
+          { headers: { 'Content-Type': 'application/json' }, timeout: 15000 }
+        );
+        clawData = clawResult.data;
+      } catch (e) {
+        clawData = { code: -1, message: e.message };
+      }
+
+      if (clawData.code !== 0 || !clawData.data || !clawData.data.address) {
+        await query('UPDATE orders SET status = $1 WHERE id = $2', [ORDER_STATUS.CANCELLED, orderId]);
+        await query('UPDATE tournaments SET status = $1 WHERE id = $2', ['cancelled', tournamentId]);
+        console.error('[Payment] ClawPay error:', clawData);
+        return res.status(500).json({ error: 'usdt payment creation failed', detail: clawData.message });
+      }
+
+      await query(
+        `UPDATE orders SET payment_method = 'usdt', xunhupay_order_id = $1,
+           usdt_order_id = $1, usdt_amount = $2, usdt_address = $3
+         WHERE id = $4`,
+        [tradeOrderId, usdtAmount, clawData.data.address, orderId]
+      );
+
+      return res.json({
+        orderId,
+        tournamentId,
+        displayCode,
+        amount,
+        paymentMethod: 'usdt',
+        usdtAmount,
+        usdtAddress: clawData.data.address,
+        expiresAt: clawData.data.expires_at,
+        payUrl: `${PUBLIC_BASE_URL}/pay/usdt-pay.html?order=${orderId}`,
+      });
+    }
+
+    // ==================== 虎皮椒通道（微信/支付宝） ====================
     // 调用虎皮椒创建支付
-    const xunhuOrderId = `PN-${orderId}-${Date.now()}`;
+    const xunhuOrderId = tradeOrderId;
     const notifyUrl = `${PUBLIC_BASE_URL}/pay/api/v1/payment/notify`;
     const returnUrl = `${PUBLIC_BASE_URL}/pay/pay-result.html?order=${orderId}`;
 
@@ -165,6 +222,52 @@ app.post('/api/v1/payment/create', async (req, res) => {
 });
 
 // ============================================================
+// 订单确认支付（共用：虎皮椒回调 / USDT 回调 / USDT 轮询）
+// 返回 true 表示本次新确认，false 表示已处理过
+// ============================================================
+async function markOrderPaid(orderId) {
+  const client = await db.getClient();
+  let order;
+  try {
+    await client.query('BEGIN');
+
+    const orderResult = await client.query(
+      'UPDATE orders SET status = $1, paid_at = NOW() WHERE id = $2 AND status = $3 RETURNING *',
+      [ORDER_STATUS.PAID, orderId, ORDER_STATUS.PENDING]
+    );
+
+    if (orderResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return false; // 已处理过
+    }
+
+    order = orderResult.rows[0];
+
+    await client.query(
+      'UPDATE tournaments SET status = $1 WHERE id = $2',
+      ['registering', order.tournament_id]
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  // 触发赛事激活
+  try {
+    const { activateTournament } = require('../poker-socket');
+    await activateTournament(order.tournament_id);
+  } catch (e) {
+    console.error('[Payment] Failed to activate tournament:', e.message);
+  }
+
+  return true;
+}
+
+// ============================================================
 // 虎皮椒回调（form-urlencoded POST）
 // ============================================================
 app.post('/api/v1/payment/notify', async (req, res) => {
@@ -185,48 +288,152 @@ app.post('/api/v1/payment/notify', async (req, res) => {
   }
 
   const xunhuOrderId = data.trade_order_id;
-  const orderId = parseInt(xunhuOrderId.split('-')[1]);
 
   try {
-    const client = await db.getClient();
-    await client.query('BEGIN');
-
-    // 更新订单状态
-    const orderResult = await client.query(
-      'UPDATE orders SET status = $1, paid_at = NOW() WHERE id = $2 AND status = $3 RETURNING *',
-      [ORDER_STATUS.PAID, orderId, ORDER_STATUS.PENDING]
+    // 按网关订单号直接查单（orderId 是 UUID，不能从订单号里 parse）
+    const orderResult = await query(
+      'SELECT id FROM orders WHERE xunhupay_order_id = $1',
+      [xunhuOrderId]
     );
-
-    if (orderResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.send('success'); // 已处理过
-    }
-
     const order = orderResult.rows[0];
-
-    // 更新赛事状态
-    await client.query(
-      'UPDATE tournaments SET status = $1 WHERE id = $2',
-      ['registering', order.tournament_id]
-    );
-
-    await client.query('COMMIT');
-
-    // 触发赛事激活
-    try {
-      const { activateTournament } = require('../poker-socket');
-      await activateTournament(order.tournament_id);
-    } catch (e) {
-      console.error('[Payment] Failed to activate tournament:', e.message);
+    if (!order) {
+      console.error('[Payment] Notify: order not found for', xunhuOrderId);
+      return res.send('fail');
     }
 
-    console.log('[Payment] Order', orderId, 'paid successfully');
+    const marked = await markOrderPaid(order.id);
+    if (marked) console.log('[Payment] Order', order.id, 'paid successfully (xunhu)');
     res.send('success');
   } catch (err) {
     console.error('[Payment] Notify error:', err.message);
     res.send('fail');
   }
 });
+
+// ============================================================
+// USDT 回调（ClawPay 网关通知，字段名宽容解析；
+// 不盲信回调，一律向网关查证后才确认）
+// ============================================================
+app.post('/api/v1/payment/usdt-notify', async (req, res) => {
+  const data = req.body || {};
+  const orderNo = data.order_no || data.orderNo || data.trade_order_id || data.out_trade_no;
+  if (!orderNo) return res.status(400).json({ error: 'missing order_no' });
+
+  try {
+    const confirmed = await verifyAndMarkUsdtOrder(orderNo);
+    res.json({ success: true, confirmed });
+  } catch (err) {
+    console.error('[Payment] USDT notify error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 向 ClawPay 查证订单状态，已确认则落库
+async function verifyAndMarkUsdtOrder(orderNo) {
+  const orderResult = await query(
+    `SELECT id, status FROM orders WHERE usdt_order_id = $1`,
+    [orderNo]
+  );
+  const order = orderResult.rows[0];
+  if (!order) {
+    console.error('[Payment] USDT order not found:', orderNo);
+    return false;
+  }
+  if (order.status !== ORDER_STATUS.PENDING) return false; // 已处理
+
+  // 向网关查证（回调不可信，以网关状态为准）
+  const q = await axios.get(
+    `${CLAWPAY_API}?action=query_order&order_no=${encodeURIComponent(orderNo)}`,
+    { timeout: 15000 }
+  );
+  const st = q.data && q.data.data && q.data.data.status;
+  if (st !== 'confirmed' && st !== 'paid' && st !== 'completed') {
+    return false;
+  }
+
+  const marked = await markOrderPaid(order.id);
+  if (marked) console.log('[Payment] Order', order.id, 'paid successfully (usdt)');
+  return marked;
+}
+
+// ============================================================
+// USDT 订单状态查询（支付页轮询用）
+// ============================================================
+app.get('/api/v1/payment/usdt-status/:orderId', async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT o.id, o.status, o.amount, o.usdt_amount, o.usdt_address, o.usdt_order_id, o.created_at,
+              t.display_code
+       FROM orders o LEFT JOIN tournaments t ON o.tournament_id = t.id
+       WHERE o.id = $1`,
+      [req.params.orderId]
+    );
+    const order = result.rows[0];
+    if (!order) return res.status(404).json({ error: 'order not found' });
+    res.json({
+      orderId: order.id,
+      status: order.status,
+      displayCode: order.display_code,
+      amountCny: order.amount / 100,
+      usdtAmount: order.usdt_amount ? parseFloat(order.usdt_amount) : null,
+      usdtAddress: order.usdt_address,
+      usdtOrderId: order.usdt_order_id,
+      createdAt: order.created_at,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// USDT 收款地址二维码（PNG）
+// ============================================================
+app.get('/api/v1/payment/usdt-qr/:orderId.png', async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT usdt_address FROM orders WHERE id = $1',
+      [req.params.orderId]
+    );
+    const order = result.rows[0];
+    if (!order || !order.usdt_address) return res.status(404).json({ error: 'no address' });
+
+    const QRCode = require('qrcode');
+    const buf = await QRCode.toBuffer(order.usdt_address, {
+      width: 320,
+      margin: 2,
+      color: { dark: '#1a1a24', light: '#ffffff' },
+    });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(buf);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// USDT 轮询兜底（网关回调可能丢失，每 30s 主动查证）
+// ============================================================
+const USDT_POLL_INTERVAL = parseInt(process.env.USDT_POLL_INTERVAL_MS || '30000', 10);
+setInterval(async () => {
+  try {
+    const result = await query(
+      `SELECT usdt_order_id FROM orders
+       WHERE payment_method = 'usdt' AND status = 'pending'
+         AND created_at > NOW() - INTERVAL '24 hours'
+       ORDER BY created_at ASC LIMIT 20`
+    );
+    for (const row of result.rows) {
+      try {
+        await verifyAndMarkUsdtOrder(row.usdt_order_id);
+      } catch (e) {
+        console.error('[Payment] USDT poll error for', row.usdt_order_id, e.message);
+      }
+    }
+  } catch (e) {
+    console.error('[Payment] USDT poll error:', e.message);
+  }
+}, USDT_POLL_INTERVAL).unref();
 
 // ============================================================
 // 退款
@@ -241,6 +448,11 @@ app.post('/api/v1/refund', auth, async (req, res) => {
     const order = orderResult.rows[0];
     if (!order) return res.status(404).json({ error: 'order not found' });
     if (order.status !== ORDER_STATUS.PAID) return res.status(400).json({ error: 'order not in paid state' });
+
+    // USDT 订单无法走虎皮椒退款，链上转账需人工处理
+    if (order.payment_method === 'usdt') {
+      return res.status(400).json({ error: 'USDT 订单需人工原路退回（链上转账），请联系平台处理' });
+    }
 
     // 调用虎皮椒退款 API
     const params = {
@@ -389,6 +601,7 @@ function generateDisplayCode() {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Payment] running on port ${PORT}`);
   console.log(`[Payment] Xunhupay APPID: ${XUNHU_APPID}`);
+  console.log(`[Payment] USDT gateway: ${CLAWPAY_API}, rate: ${USDT_CNY_RATE} CNY/USDT`);
 });
 
 module.exports = app;

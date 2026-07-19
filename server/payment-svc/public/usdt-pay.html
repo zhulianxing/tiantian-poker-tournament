@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天天扑克锦标赛 - USDT 支付</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0a0a0f;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.container{max-width:420px;width:100%}
+.card{background:#1a1a24;border:1px solid #2a2a38;border-radius:20px;padding:32px 28px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+.header{text-align:center;margin-bottom:24px}
+.logo{font-size:24px;font-weight:800;color:#FFD700;letter-spacing:2px;margin-bottom:4px}
+.subtitle{font-size:13px;color:#9c9ca8}
+.amount-section{text-align:center;margin-bottom:20px}
+.usdt-amount{font-size:40px;font-weight:800;color:#FFD700}
+.usdt-amount small{font-size:20px;color:#c9a227}
+.cny-amount{font-size:13px;color:#9c9ca8;margin-top:4px}
+.addr-section{background:#12121a;border:1px solid #2a2a38;border-radius:14px;padding:18px;margin-bottom:16px}
+.addr-label{font-size:12px;color:#9c9ca8;margin-bottom:8px}
+.addr-value{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;word-break:break-all;color:#e0e0e0;line-height:1.5}
+.copy-btn{display:block;width:100%;margin-top:12px;padding:11px;border:none;border-radius:10px;background:#FFD700;color:#1a1400;font-size:14px;font-weight:700;cursor:pointer}
+.copy-btn:active{opacity:0.85}
+.qr-section{text-align:center;margin-bottom:16px}
+.qr-section img{width:180px;height:180px;border-radius:12px;background:#fff;padding:8px}
+.network-warn{background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:12px;font-size:13px;color:#FFD700;text-align:center;margin-bottom:16px}
+.status-section{text-align:center;padding:14px;border-radius:12px;font-size:14px}
+.status-pending{background:rgba(62,138,237,0.1);border:1px solid rgba(62,138,237,0.3);color:#3e8aed}
+.status-paid{background:rgba(70,167,88,0.12);border:1px solid rgba(70,167,88,0.4);color:#46a758}
+.status-expired{background:rgba(229,72,77,0.1);border:1px solid rgba(229,72,77,0.3);color:#e5484d}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(62,138,237,0.3);border-top-color:#3e8aed;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-msg{background:rgba(229,72,77,0.1);border:1px solid rgba(229,72,77,0.3);color:#e5484d;padding:12px;border-radius:8px;font-size:14px;text-align:center;margin-bottom:16px;display:none}
+.error-msg.show{display:block}
+.timer{font-size:12px;color:#9c9ca8;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="header">
+      <div class="logo">♠ 天天扑克锦标赛</div>
+      <div class="subtitle">USDT 扫码支付（BSC 链）</div>
+    </div>
+    <div id="error" class="error-msg"></div>
+    <div id="main" style="display:none">
+      <div class="amount-section">
+        <div class="usdt-amount"><span id="usdtAmount">—</span> <small>USDT</small></div>
+        <div class="cny-amount">≈ ¥ <span id="cnyAmount">—</span>（赛事 <span id="displayCode">—</span>）</div>
+      </div>
+      <div class="network-warn">⚠️ 请仅通过 BSC（BEP-20）网络转入 USDT，其他链资产将无法找回</div>
+      <div class="qr-section">
+        <img id="qrImg" alt="收款地址二维码">
+      </div>
+      <div class="addr-section">
+        <div class="addr-label">收款地址（点击复制）</div>
+        <div class="addr-value" id="address">—</div>
+        <button class="copy-btn" onclick="copyAddr()">复制收款地址</button>
+      </div>
+      <div class="status-section status-pending" id="statusBox">
+        <span class="spinner"></span>等待链上确认，请完成转账…
+        <div class="timer" id="timer"></div>
+      </div>
+    </div>
+    <div id="loadingInfo" style="text-align:center;color:#9c9ca8;font-size:14px;padding:40px 0">正在加载订单…</div>
+  </div>
+</div>
+<script>
+var orderId = '';
+var pollTimer = null;
+var expireTimer = null;
+var addrText = '';
+
+function getParam(name) {
+  return new URLSearchParams(window.location.search).get(name) || '';
+}
+
+function showError(msg) {
+  var el = document.getElementById('error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function copyAddr() {
+  if (!addrText) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(addrText).then(function(){
+      var btn = document.querySelector('.copy-btn');
+      btn.textContent = '已复制 ✓';
+      setTimeout(function(){ btn.textContent = '复制收款地址'; }, 2000);
+    });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = addrText;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+async function pollStatus() {
+  try {
+    var resp = await fetch('/pay/api/v1/payment/usdt-status/' + encodeURIComponent(orderId));
+    if (!resp.ok) return;
+    var o = await resp.json();
+    var box = document.getElementById('statusBox');
+    if (o.status === 'paid') {
+      clearInterval(pollTimer);
+      clearInterval(expireTimer);
+      box.className = 'status-section status-paid';
+      box.innerHTML = '✓ 支付成功！正在开局…';
+      setTimeout(function(){
+        window.location.href = '/pay/pay-result.html?order=' + encodeURIComponent(orderId);
+      }, 1500);
+    }
+  } catch(e) { /* 网络抖动忽略 */ }
+}
+
+async function loadOrder() {
+  orderId = getParam('order');
+  if (!orderId) {
+    document.getElementById('loadingInfo').textContent = '';
+    showError('缺少订单参数');
+    return;
+  }
+  try {
+    var resp = await fetch('/pay/api/v1/payment/usdt-status/' + encodeURIComponent(orderId));
+    if (!resp.ok) throw new Error('订单查询失败 (' + resp.status + ')');
+    var o = await resp.json();
+    if (!o.usdtAddress) throw new Error('订单缺少收款地址');
+
+    document.getElementById('loadingInfo').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    document.getElementById('usdtAmount').textContent = o.usdtAmount;
+    document.getElementById('cnyAmount').textContent = Number(o.amountCny).toFixed(2);
+    document.getElementById('displayCode').textContent = o.displayCode || '—';
+    document.getElementById('address').textContent = o.usdtAddress;
+    document.getElementById('qrImg').src = '/pay/api/v1/payment/usdt-qr/' + encodeURIComponent(orderId) + '.png';
+    addrText = o.usdtAddress;
+
+    if (o.status === 'paid') {
+      window.location.href = '/pay/pay-result.html?order=' + encodeURIComponent(orderId);
+      return;
+    }
+
+    // 过期倒计时（订单创建后 30 分钟）
+    var created = new Date(o.createdAt).getTime();
+    var expires = created + 30 * 60 * 1000;
+    var timerEl = document.getElementById('timer');
+    expireTimer = setInterval(function(){
+      var remain = Math.max(0, expires - Date.now());
+      var m = Math.floor(remain / 60000);
+      var s = Math.floor((remain % 60000) / 1000);
+      timerEl.textContent = '剩余支付时间 ' + m + ':' + String(s).padStart(2, '0');
+      if (remain <= 0) {
+        clearInterval(expireTimer);
+        clearInterval(pollTimer);
+        var box = document.getElementById('statusBox');
+        box.className = 'status-section status-expired';
+        box.textContent = '订单已过期，请重新发起支付';
+      }
+    }, 1000);
+
+    pollTimer = setInterval(pollStatus, 5000);
+    pollStatus();
+  } catch(e) {
+    document.getElementById('loadingInfo').textContent = '';
+    showError(e.message);
+  }
+}
+
+loadOrder();
+</script>
+</body>
+</html>
