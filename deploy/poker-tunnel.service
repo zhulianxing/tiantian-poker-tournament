@@ -1,0 +1,26 @@
+# poker-tunnel.service — 美国边缘节点 → 首尔后端的 SSH 隧道
+# 部署位置：美国服务器 /etc/systemd/system/poker-tunnel.service
+# 管理：systemctl status|restart|stop poker-tunnel
+# 前提：美国服务器 root 的 ~/.ssh/id_ed25519.pub 已加入首尔 /root/.ssh/authorized_keys
+
+[Unit]
+Description=Poker backend SSH tunnel to Seoul
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ssh -N -T \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o ExitOnForwardFailure=yes \
+  -o StrictHostKeyChecking=no \
+  -L 127.0.0.1:3000:127.0.0.1:3000 \
+  -L 127.0.0.1:3001:127.0.0.1:3001 \
+  -L 127.0.0.1:3002:127.0.0.1:3002 \
+  -L 127.0.0.1:3003:127.0.0.1:3003 \
+  root@43.164.130.145
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
