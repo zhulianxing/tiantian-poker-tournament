@@ -1,6 +1,7 @@
 package com.pokernight.player.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,14 +27,23 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pokernight.player.data.GameViewModel
+import com.pokernight.player.ui.theme.ActionRed
 import com.pokernight.player.ui.theme.BgDark
+import com.pokernight.player.ui.theme.BgElevated
 import com.pokernight.player.ui.theme.Gold
+import com.pokernight.player.ui.theme.GoldDark
+import com.pokernight.player.ui.theme.SurfaceBorder
+import com.pokernight.player.ui.theme.SurfaceCard
+import com.pokernight.player.ui.theme.TableGreenDark
+import com.pokernight.player.ui.theme.TextSecondary
+import com.pokernight.player.ui.theme.TextTertiary
 import com.pokernight.player.ui.theme.White
 import kotlinx.coroutines.delay
 
@@ -77,7 +87,11 @@ fun TableLobbyScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDark)
+            .background(
+                Brush.verticalGradient(
+                    listOf(TableGreenDark, BgDark, BgDark)
+                )
+            )
             .padding(16.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -90,13 +104,13 @@ fun TableLobbyScreen(
                 TextButton(onClick = {
                     viewModel.leaveTournament(tableCode, onLeave)
                 }) {
-                    Text("← 离开座位", color = Color(0xFFE53935))
+                    Text("← 离开座位", color = ActionRed)
                 }
                 Text(
                     text = "等待开赛",
                     color = Gold,
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.ExtraBold,
                 )
             }
 
@@ -106,8 +120,9 @@ fun TableLobbyScreen(
             joinResult?.let { result ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF16213E)),
-                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldDark.copy(alpha = 0.5f)),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -115,12 +130,12 @@ fun TableLobbyScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("我的座位", color = White.copy(alpha = 0.7f), fontSize = 14.sp)
+                            Text("我的座位", color = TextSecondary, fontSize = 14.sp)
                             Text(
                                 text = "Seat ${result.seatIndex}",
                                 color = Gold,
                                 fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.ExtraBold,
                             )
                         }
                         Spacer(Modifier.height(8.dp))
@@ -128,7 +143,7 @@ fun TableLobbyScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            Text("初始筹码", color = White.copy(alpha = 0.7f), fontSize = 14.sp)
+                            Text("初始筹码", color = TextSecondary, fontSize = 14.sp)
                             Text(
                                 text = "${if (result.chipCount > 0) result.chipCount else result.startChips}",
                                 color = Gold,
@@ -140,14 +155,15 @@ fun TableLobbyScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
             // Tournament info
             tableStatus?.tournament?.let { tournament ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF16213E)),
-                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceBorder),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -156,20 +172,23 @@ fun TableLobbyScreen(
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(6.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("盲注", color = White.copy(alpha = 0.7f), fontSize = 13.sp)
+                            Text("盲注", color = TextSecondary, fontSize = 13.sp)
                             Text("${tournament.sb}/${tournament.bb}", color = Gold, fontSize = 13.sp)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("入座", color = White.copy(alpha = 0.7f), fontSize = 13.sp)
+                            Text("入座", color = TextSecondary, fontSize = 13.sp)
                             Text("${tournament.playerCount}/${tournament.maxPlayers}", color = Gold, fontSize = 13.sp)
                         }
-                        Text("状态: ${tournament.status}", color = White.copy(alpha = 0.7f), fontSize = 13.sp)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("状态", color = TextSecondary, fontSize = 13.sp)
+                            Text(tournament.status, color = TextSecondary, fontSize = 13.sp)
+                        }
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
 
                 // Countdown
                 if (tournament.status == "registering") {
@@ -180,12 +199,12 @@ fun TableLobbyScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "⏳",
-                                fontSize = 48.sp,
+                                fontSize = 40.sp,
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 text = "等待赛事开始...",
-                                color = White.copy(alpha = 0.7f),
+                                color = TextSecondary,
                                 fontSize = 14.sp,
                             )
                         }
@@ -193,7 +212,7 @@ fun TableLobbyScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
             // Player list
             tableStatus?.let { status ->
@@ -207,12 +226,13 @@ fun TableLobbyScreen(
                     Spacer(Modifier.height(8.dp))
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         items(status.players) { player ->
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1B2A)),
-                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = BgElevated),
+                                shape = RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceBorder),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Row(
@@ -237,7 +257,7 @@ fun TableLobbyScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
             // Leave button
             Button(
@@ -246,7 +266,7 @@ fun TableLobbyScreen(
                     .fillMaxWidth()
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE53935),
+                    containerColor = ActionRed,
                     contentColor = Color.White,
                 ),
                 shape = RoundedCornerShape(12.dp),
@@ -258,7 +278,7 @@ fun TableLobbyScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = err,
-                    color = Color.Red,
+                    color = ActionRed,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),

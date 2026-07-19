@@ -1,6 +1,7 @@
 package com.pokernight.player.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,7 +25,11 @@ import androidx.compose.ui.unit.sp
 import com.pokernight.player.ui.theme.ActionBlue
 import com.pokernight.player.ui.theme.ActionGreen
 import com.pokernight.player.ui.theme.ActionRed
+import com.pokernight.player.ui.theme.BgElevated
 import com.pokernight.player.ui.theme.DisabledGray
+import com.pokernight.player.ui.theme.Gold
+import com.pokernight.player.ui.theme.SurfaceBorder
+import com.pokernight.player.ui.theme.TextTertiary
 import com.pokernight.player.ui.theme.White
 
 @Composable
@@ -43,22 +49,29 @@ fun ActionPanel(
     onAllIn: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val bgColor = if (isMyTurn) Color(0xCC1A1A2E) else Color(0x66000000)
-
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-            .background(bgColor)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(BgElevated, Color(0xFF0D0D14))
+                )
+            )
+            .border(
+                width = 1.dp,
+                color = if (isMyTurn) Gold.copy(alpha = 0.35f) else SurfaceBorder,
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            )
+            .padding(horizontal = 10.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (!isMyTurn) {
             Text(
-                text = "等待中…",
-                color = DisabledGray,
-                fontSize = 16.sp,
+                text = "等待其他玩家行动…",
+                color = TextTertiary,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
             )
         } else {
@@ -67,27 +80,32 @@ fun ActionPanel(
                 color = ActionRed,
                 enabled = true,
                 onClick = onFold,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(8.dp))
             ActionButton(
                 text = if (callAmount == 0) "过牌" else "跟注 $callAmount",
                 color = ActionGreen,
                 enabled = true,
                 onClick = if (callAmount == 0) onCheck else onCall,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(8.dp))
             ActionButton(
                 text = "加注 $raiseAmount",
                 color = ActionBlue,
                 enabled = raiseAmount in minRaise..myChips,
                 onClick = onRaise,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(8.dp))
             ActionButton(
                 text = "全下",
-                color = ActionRed,
+                color = Gold,
+                contentColor = Color(0xFF1A1400),
                 enabled = myChips > 0,
                 onClick = onAllIn,
+                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -99,18 +117,24 @@ private fun ActionButton(
     color: Color,
     enabled: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentColor: Color = White,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (enabled) color else DisabledGray,
-            contentColor = White,
+            containerColor = color,
+            contentColor = contentColor,
             disabledContainerColor = DisabledGray,
-            disabledContentColor = Color.Gray,
+            disabledContentColor = Color(0xFF888888),
         ),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.height(44.dp),
+        shape = RoundedCornerShape(12.dp),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 1.dp,
+        ),
+        modifier = modifier.height(48.dp),
     ) {
         Text(
             text = text,

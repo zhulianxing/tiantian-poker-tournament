@@ -3,6 +3,7 @@
 package com.pokernight.tvdisplay.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -30,8 +31,9 @@ fun TopBar(
         modifier = modifier
             .fillMaxWidth()
             .height(64.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(SeatBg)
+            .border(1.dp, SeatBorder, RoundedCornerShape(12.dp))
             .padding(horizontal = 24.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,

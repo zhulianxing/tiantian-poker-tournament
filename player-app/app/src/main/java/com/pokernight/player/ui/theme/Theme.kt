@@ -7,14 +7,17 @@ import androidx.compose.runtime.Composable
 
 private val PokerColorScheme = darkColorScheme(
     primary = Gold,
+    onPrimary = Black,
     secondary = TableGreen,
+    onSecondary = White,
     tertiary = ActionBlue,
     background = BgDark,
-    surface = DarkSurface,
-    onPrimary = Black,
-    onSecondary = White,
     onBackground = White,
+    surface = SurfaceCard,
     onSurface = White,
+    surfaceVariant = BgElevated,
+    onSurfaceVariant = TextSecondary,
+    outline = SurfaceBorder,
     error = ActionRed,
 )
 

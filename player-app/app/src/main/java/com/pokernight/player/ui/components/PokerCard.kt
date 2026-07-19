@@ -6,27 +6,28 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pokernight.player.data.model.Card
 import com.pokernight.player.ui.theme.CardWhite
 import com.pokernight.player.ui.theme.DisabledGray
 import com.pokernight.player.ui.theme.Gold
+import com.pokernight.player.ui.theme.GoldDark
+import com.pokernight.player.ui.theme.SuitBlack
+import com.pokernight.player.ui.theme.SuitRed
 
 private fun suitSymbol(suit: String): String = when (suit.lowercase()) {
     "hearts" -> "♥"
@@ -37,8 +38,8 @@ private fun suitSymbol(suit: String): String = when (suit.lowercase()) {
 }
 
 private fun suitColor(suit: String): Color = when (suit.lowercase()) {
-    "hearts", "diamonds" -> Color.Red
-    "clubs", "spades" -> Color.Black
+    "hearts", "diamonds" -> SuitRed
+    "clubs", "spades" -> SuitBlack
     else -> DisabledGray
 }
 
@@ -49,56 +50,65 @@ fun PokerCard(
     faceDown: Boolean = false,
     isBig: Boolean = false,
 ) {
-    val w = if (isBig) 70.dp else 44.dp
-    val h = if (isBig) 100.dp else 62.dp
-    val fs = if (isBig) 28.sp else 16.sp
-    val ss = if (isBig) 22.sp else 14.sp
+    val w = if (isBig) 74.dp else 46.dp
+    val h = if (isBig) 104.dp else 64.dp
+    val corner = if (isBig) 10.dp else 7.dp
 
     Box(
         modifier = modifier
             .size(width = w, height = h)
-            .clip(RoundedCornerShape(if (isBig) 10.dp else 6.dp))
+            .shadow(if (isBig) 8.dp else 4.dp, RoundedCornerShape(corner))
+            .clip(RoundedCornerShape(corner))
             .background(
                 if (faceDown || card == null) {
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF1a237e), Color(0xFF0d47a1))
+                    // 牌背：深蓝金纹
+                    Brush.linearGradient(
+                        listOf(Color(0xFF16213E), Color(0xFF0F3460), Color(0xFF16213E))
                     )
                 } else {
-                    Brush.verticalGradient(listOf(CardWhite, Color(0xFFE8E8E0)))
+                    Brush.verticalGradient(listOf(CardWhite, Color(0xFFEDEDE4)))
                 }
             )
             .border(
-                width = if (isBig) 2.dp else 1.dp,
-                color = if (faceDown || card == null) Gold else Color(0xFFCCCCCC),
-                shape = RoundedCornerShape(if (isBig) 10.dp else 6.dp),
-            )
-            .padding(if (isBig) 6.dp else 3.dp),
+                width = if (isBig) 1.5.dp else 1.dp,
+                color = if (faceDown || card == null) GoldDark else Color(0xFFD8D8CE),
+                shape = RoundedCornerShape(corner),
+            ),
         contentAlignment = Alignment.Center,
     ) {
         if (faceDown || card == null) {
-            Text(
-                text = "🂠",
-                fontSize = if (isBig) 40.sp else 24.sp,
-                color = Gold,
-            )
+            // 牌背花纹：内框 + 黑桃标
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(if (isBig) 6.dp else 4.dp)
+                    .border(1.dp, Gold.copy(alpha = 0.5f), RoundedCornerShape(if (isBig) 6.dp else 4.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "♠",
+                    fontSize = if (isBig) 34.sp else 20.sp,
+                    color = Gold,
+                )
+            }
+        } else if (card.suit.isEmpty() && card.rank.isEmpty()) {
+            Text("?", fontSize = if (isBig) 28.sp else 16.sp, color = DisabledGray)
         } else {
-            if (card.suit.isEmpty() && card.rank.isEmpty()) {
-                Text("?", fontSize = fs, color = DisabledGray)
-            } else {
-                val color = suitColor(card.suit)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = card.rank.ifEmpty { "?" },
-                        fontSize = fs,
-                        fontWeight = FontWeight.Bold,
-                        color = color,
-                    )
-                    Text(
-                        text = suitSymbol(card.suit),
-                        fontSize = ss,
-                        color = color,
-                    )
-                }
+            val color = suitColor(card.suit)
+            val rankFs = if (isBig) 30.sp else 17.sp
+            val suitFs = if (isBig) 24.sp else 14.sp
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = card.rank.ifEmpty { "?" },
+                    fontSize = rankFs,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = color,
+                )
+                Text(
+                    text = suitSymbol(card.suit),
+                    fontSize = suitFs,
+                    color = color,
+                )
             }
         }
     }

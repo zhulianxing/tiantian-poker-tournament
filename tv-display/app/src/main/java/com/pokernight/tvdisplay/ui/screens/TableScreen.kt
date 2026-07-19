@@ -3,6 +3,7 @@
 package com.pokernight.tvdisplay.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -76,17 +77,26 @@ private fun PokerTableContent(state: TableState) {
             .fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        // Table oval background
+        // 牌桌：木质桌沿 + 绿色毡面（双层椭圆）
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.85f)
-                .clip(RoundedCornerShape(120.dp))
+                .fillMaxWidth(0.94f)
+                .fillMaxHeight(0.88f)
+                .clip(RoundedCornerShape(130.dp))
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(TableRimLight, TableRim, Color(0xFF241A0C)),
+                    )
+                )
+                .border(2.dp, GoldDark.copy(alpha = 0.5f), RoundedCornerShape(130.dp))
+                .padding(14.dp)
+                .clip(RoundedCornerShape(116.dp))
                 .background(
                     Brush.radialGradient(
                         colors = listOf(TableGreen, TableGreenDark),
                     )
-                ),
+                )
+                .border(1.dp, GoldAccent.copy(alpha = 0.25f), RoundedCornerShape(116.dp)),
         ) {
             // Table content
             Column(
@@ -173,23 +183,27 @@ private fun CenterArea(state: TableState) {
             )
         }
 
-        // ── Pot (below cards) ──
+        // ── Pot (below cards)：金色徽章 ──
         if (state.pot > 0) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset(y = (-12).dp)
                     .background(
-                        color = Color.Black.copy(alpha = 0.25f),
-                        shape = RoundedCornerShape(16.dp),
+                        brush = Brush.horizontalGradient(
+                            listOf(Color(0x33FFD700), Color(0x1AFFD700), Color(0x33FFD700))
+                        ),
+                        shape = RoundedCornerShape(20.dp),
                     )
-                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                    .border(1.dp, GoldAccent.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 24.dp, vertical = 7.dp),
             ) {
                 Text(
-                    text = "Pot: $potText",
+                    text = "POT  $potText",
                     color = GoldAccent,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp,
                 )
             }
         }
