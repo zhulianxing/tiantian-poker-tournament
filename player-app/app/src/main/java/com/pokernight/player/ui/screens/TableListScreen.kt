@@ -52,6 +52,8 @@ fun TableListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var tableCode by remember { mutableStateOf("") }
+    // 进入本屏时读取一次：若有未结束的牌局则显示"返回牌局"
+    val activeTable = remember { viewModel.getActiveTable() }
 
     Box(
         modifier = Modifier
@@ -106,6 +108,25 @@ fun TableListScreen(
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
             ) {
                 Text("📱  扫码入座", fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+            }
+
+            // 返回牌局：有未结束赛事时显示
+            if (activeTable != null) {
+                Spacer(Modifier.height(14.dp))
+                Button(
+                    onClick = { onTableClick(activeTable) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SurfaceCard,
+                        contentColor = Gold,
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Gold.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Text("♠  返回牌局 · $activeTable", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
             Spacer(Modifier.height(28.dp))

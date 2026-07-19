@@ -1,7 +1,9 @@
 package com.pokernight.tvdisplay.data.network
 
+import android.app.Application
+import android.content.Context
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pokernight.tvdisplay.data.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,11 +17,15 @@ import org.json.JSONObject
 /**
  * ViewModel managing table state via Socket.IO events.
  */
-class TableViewModel : ViewModel() {
+class TableViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "TableViewModel"
+        private const val PREFS_NAME = "tv_display_prefs"
+        private const val KEY_TABLE_CODE = "table_code"
     }
+
+    private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _uiState = MutableStateFlow(TableState())
     val uiState: StateFlow<TableState> = _uiState.asStateFlow()
@@ -46,6 +52,9 @@ class TableViewModel : ViewModel() {
         _isConnecting.value = true
         _connectionError.value = null
 
+        // Persist binding so TV auto-reconnects after restart
+        prefs.edit().putString(KEY_TABLE_CODE, tableCode).apply()
+
         viewModelScope.launch {
             socketService.connect(
                 tableCode = tableCode,
@@ -70,7 +79,12 @@ class TableViewModel : ViewModel() {
         }
     }
 
+    /** Saved table code from previous session, if any. */
+    fun getSavedTableCode(): String? = prefs.getString(KEY_TABLE_CODE, null)
+
     fun disconnect() {
+        // Manual disconnect clears the binding
+        prefs.edit().remove(KEY_TABLE_CODE).apply()
         socketService.disconnect()
         _uiState.value = TableState()
         _isConnecting.value = false

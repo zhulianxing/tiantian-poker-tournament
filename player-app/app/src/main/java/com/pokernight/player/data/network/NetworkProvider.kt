@@ -43,8 +43,10 @@ object NetworkProvider {
         val options = IO.Options().apply {
             transports = arrayOf(WebSocket.NAME)
             reconnection = true
-            reconnectionAttempts = 5
-            reconnectionDelay = 2000
+            reconnectionAttempts = 0 // 0 = unlimited; app must recover after doze/background
+            reconnectionDelay = 1000
+            reconnectionDelayMax = 10000
+            randomizationFactor = 0.5
             if (token != null) {
                 auth = mapOf("token" to token)
             }

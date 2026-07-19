@@ -10,6 +10,7 @@ object AuthManager {
     private const val KEY_NICKNAME = "nickname"
     private const val KEY_EMAIL = "email"
     private const val KEY_AVATAR = "avatar"
+    private const val KEY_ACTIVE_TABLE = "active_table"
 
     private lateinit var prefs: SharedPreferences
 
@@ -38,6 +39,18 @@ object AuthManager {
     fun getAvatar(): String? = prefs.getString(KEY_AVATAR, "🃏")
 
     fun isLoggedIn(): Boolean = getToken() != null
+
+    // ─── 活跃牌桌（用于"返回牌局"入口） ───
+
+    fun saveActiveTable(tableCode: String) {
+        prefs.edit().putString(KEY_ACTIVE_TABLE, tableCode).apply()
+    }
+
+    fun getActiveTable(): String? = prefs.getString(KEY_ACTIVE_TABLE, null)
+
+    fun clearActiveTable() {
+        prefs.edit().remove(KEY_ACTIVE_TABLE).apply()
+    }
 
     fun logout() {
         prefs.edit().clear().apply()

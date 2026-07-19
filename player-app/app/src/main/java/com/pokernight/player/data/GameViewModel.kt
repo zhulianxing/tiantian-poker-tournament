@@ -176,6 +176,10 @@ class GameViewModel : ViewModel() {
             try {
                 val status = api.getTableStatus(code)
                 _tableStatus.value = status
+                // 赛事已结束 → 清除"返回牌局"入口
+                if (status.tournament?.status == "finished" && AuthManager.getActiveTable() == code) {
+                    AuthManager.clearActiveTable()
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message ?: "获取牌桌状态失败")
             }
@@ -237,6 +241,7 @@ class GameViewModel : ViewModel() {
             try {
                 api.leaveTournament(tournamentId, "Bearer $token")
                 _joinResult.value = null
+                AuthManager.clearActiveTable()
                 _toast.value = "已离开座位"
                 onSuccess()
             } catch (e: Exception) {
@@ -279,14 +284,30 @@ class GameViewModel : ViewModel() {
                     val tid = data.optString("tournamentId", "")
                     _gameState.value = _gameState.value.copy(tournamentId = tid)
                 }
+                if (event == SocketService.EVT_TOURNAMENT_FINISHED) {
+                    AuthManager.clearActiveTable()
+                }
             },
         )
         socketService?.connect(token)
         // Note: joinTable is called here but Socket may not be connected yet.
         // SocketService will re-emit join_table on EVENT_CONNECT.
         socketService?.joinTable(tableCode)
+        AuthManager.saveActiveTable(tableCode)
         _uiState.value = _uiState.value.copy(socketConnected = true)
     }
+
+    /** App 回到前台时调用：socket 断开后手动触发重连（库内重连在 Doze 下不可靠）。 */
+    fun reconnectSocketIfNeeded() {
+        val ss = socketService ?: return
+        if (!ss.isConnected()) {
+            android.util.Log.i("GameViewModel", "reconnectSocketIfNeeded: reconnecting")
+            ss.connect(AuthManager.getToken())
+        }
+    }
+
+    /** 当前是否有可返回的活跃牌桌。 */
+    fun getActiveTable(): String? = AuthManager.getActiveTable()
 
     fun disconnectSocket() {
         socketService?.disconnect()

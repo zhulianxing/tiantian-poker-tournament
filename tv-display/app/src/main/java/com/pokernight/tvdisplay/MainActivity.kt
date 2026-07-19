@@ -3,6 +3,7 @@ package com.pokernight.tvdisplay
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -24,6 +25,13 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.uiState.collectAsState()
                 val isConnecting by viewModel.isConnecting.collectAsState()
                 val connectionError by viewModel.connectionError.collectAsState()
+
+                // Auto-reconnect to the previously bound table on app start
+                LaunchedEffect(Unit) {
+                    viewModel.getSavedTableCode()?.let { saved ->
+                        if (!state.connected) viewModel.connect(saved)
+                    }
+                }
 
                 when {
                     !state.connected -> ConnectScreen(

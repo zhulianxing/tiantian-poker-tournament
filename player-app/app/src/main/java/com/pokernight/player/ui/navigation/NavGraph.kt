@@ -1,12 +1,16 @@
 package com.pokernight.player.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import com.pokernight.player.data.GameViewModel
 import com.pokernight.player.ui.screens.LoginScreen
 import com.pokernight.player.ui.screens.RegisterScreen
@@ -37,6 +41,18 @@ fun PokerNavGraph(
     viewModel: GameViewModel = viewModel(),
 ) {
     val navController = rememberNavController()
+
+    // App 回到前台时，若 socket 已断开则重连并同步牌桌状态
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.reconnectSocketIfNeeded()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     NavHost(navController = navController, startDestination = Routes.SPLASH) {
 
