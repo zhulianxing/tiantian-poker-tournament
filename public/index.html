@@ -4,84 +4,215 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>天天扑克锦标赛 — 酒吧 SNG 赛事平台</title>
+<meta name="description" content="天天扑克锦标赛：扫码入座、自动开赛的酒吧 SNG 扑克平台。TV 大屏直播，微信/支付宝/USDT 双通道收款，店家流水 70% 周结。">
+<link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
 <style>
+:root{--gold:#FFD700;--gold2:#c9a227;--bg:#07070c;--panel:rgba(255,255,255,.035);--line:rgba(201,162,39,.22);--txt:#e8e8ec;--dim:#9c9ca8}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0a0a0f;color:#e8e8ec;min-height:100vh}
-.glow{position:fixed;top:-30%;left:50%;transform:translateX(-50%);width:900px;height:900px;background:radial-gradient(circle,rgba(13,90,50,.45),transparent 60%);pointer-events:none}
-.container{max-width:960px;margin:0 auto;padding:0 24px;position:relative}
-header{padding:64px 0 40px;text-align:center}
-.logo-badge{display:inline-flex;align-items:center;justify-content:center;width:84px;height:84px;background:linear-gradient(145deg,#1c1c26,#12121a);border:2px solid #c9a227;border-radius:22px;font-size:42px;color:#FFD700;margin-bottom:20px}
-h1{font-size:40px;font-weight:800;letter-spacing:2px;color:#FFD700}
-.tagline{margin-top:10px;font-size:15px;color:#9c9ca8;letter-spacing:1px}
-.en{margin-top:6px;font-size:11px;color:#c9a227;letter-spacing:4px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin:44px 0}
-.card{background:#16161f;border:1px solid #2a2a38;border-radius:18px;padding:26px}
-.card h3{font-size:17px;color:#FFD700;margin-bottom:8px}
-.card p{font-size:13px;color:#9c9ca8;line-height:1.7}
-.download{background:#14141d;border:1px solid #2a2a38;border-radius:22px;padding:36px;text-align:center;margin-bottom:44px}
-.download h2{font-size:22px;color:#fff;margin-bottom:6px}
-.download .sub{font-size:13px;color:#9c9ca8;margin-bottom:26px}
-.btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
-.btn{display:inline-flex;align-items:center;gap:10px;padding:16px 30px;border-radius:14px;font-size:16px;font-weight:700;text-decoration:none;transition:transform .15s,box-shadow .15s}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+.glow{position:fixed;border-radius:50%;pointer-events:none;filter:blur(90px);z-index:0}
+.glow-a{top:-260px;left:50%;transform:translateX(-50%);width:820px;height:820px;background:rgba(13,90,50,.34)}
+.glow-b{top:38%;left:-260px;width:560px;height:560px;background:rgba(201,162,39,.10)}
+.glow-c{bottom:-200px;right:-200px;width:620px;height:620px;background:rgba(255,215,0,.07)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+
+/* 导航 */
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(7,7,12,.72);border-bottom:1px solid rgba(201,162,39,.14)}
+.nav-in{max-width:1080px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:12px}
+.nav-in img{width:34px;height:34px}
+.nav-name{font-weight:800;font-size:16px;letter-spacing:1px}
+.nav-name span{display:block;font-size:9px;letter-spacing:3px;color:var(--gold2);font-weight:500}
+.nav-links{margin-left:auto;display:flex;gap:6px}
+.nav-links a{font-size:13px;color:var(--dim);padding:8px 14px;border-radius:10px;transition:.2s}
+.nav-links a:hover{color:var(--gold);background:rgba(255,215,0,.06)}
+.nav-cta{font-size:13px;font-weight:700;color:#1a1400!important;background:linear-gradient(135deg,#FFD700,#c9a227);border-radius:10px}
+
+/* Hero */
+.hero{text-align:center;padding:96px 0 72px}
+.hero img{width:110px;height:110px;filter:drop-shadow(0 12px 32px rgba(255,215,0,.3));animation:float 5s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.hero h1{margin-top:26px;font-size:clamp(34px,6vw,56px);font-weight:900;letter-spacing:3px;background:linear-gradient(135deg,#FFE87C,#FFD700 45%,#c9a227);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero .sub{margin-top:14px;font-size:16px;color:var(--dim);letter-spacing:1px}
+.hero .en{margin-top:8px;font-size:11px;letter-spacing:5px;color:var(--gold2)}
+.hero-cta{margin-top:36px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:9px;padding:15px 30px;border-radius:14px;font-size:15px;font-weight:700;transition:.2s}
 .btn:active{transform:scale(.97)}
-.btn-gold{background:linear-gradient(135deg,#FFD700,#c9a227);color:#1a1400;box-shadow:0 6px 24px rgba(255,215,0,.25)}
-.btn-dark{background:#1c1c26;color:#FFD700;border:1px solid #c9a227}
-.btn .ver{display:block;font-size:11px;font-weight:400;opacity:.75;margin-top:2px}
-.btn-text{flex-direction:column;align-items:flex-start}
-.links{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
-.links a{color:#c9a227;text-decoration:none;font-size:13px;border:1px solid #2a2a38;border-radius:10px;padding:10px 18px;background:#12121a}
-.links a:hover{border-color:#c9a227}
-footer{text-align:center;padding:28px 0 40px;font-size:12px;color:#55555f}
-.steps{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:44px}
-.step{flex:1;min-width:150px;background:#12121a;border:1px solid #2a2a38;border-radius:14px;padding:18px;text-align:center}
-.step .num{display:inline-block;width:28px;height:28px;line-height:28px;border-radius:50%;background:#FFD700;color:#1a1400;font-weight:800;font-size:14px;margin-bottom:8px}
-.step p{font-size:13px;color:#9c9ca8}
+.btn-gold{background:linear-gradient(135deg,#FFD700,#c9a227);color:#1a1400;box-shadow:0 8px 28px rgba(255,215,0,.25)}
+.btn-gold:hover{box-shadow:0 10px 36px rgba(255,215,0,.4);transform:translateY(-2px)}
+.btn-ghost{border:1px solid var(--line);color:var(--gold);background:rgba(255,255,255,.02)}
+.btn-ghost:hover{border-color:var(--gold2);transform:translateY(-2px)}
+.stats{margin:58px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:760px}
+.stat{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:18px 10px;backdrop-filter:blur(8px)}
+.stat b{display:block;font-size:24px;color:var(--gold);font-weight:900}
+.stat span{font-size:12px;color:var(--dim)}
+
+/* 区块 */
+section{padding:64px 0}
+.sec-head{text-align:center;margin-bottom:40px}
+.sec-head .kick{font-size:11px;letter-spacing:4px;color:var(--gold2)}
+.sec-head h2{margin-top:10px;font-size:clamp(24px,4vw,34px);font-weight:800}
+.sec-head p{margin-top:10px;font-size:14px;color:var(--dim)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.feat{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:20px;padding:28px;transition:.25s;backdrop-filter:blur(8px)}
+.feat:hover{transform:translateY(-4px);border-color:var(--line);box-shadow:0 16px 40px rgba(0,0,0,.4)}
+.feat .ico{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;background:linear-gradient(145deg,rgba(255,215,0,.16),rgba(255,215,0,.04));border:1px solid var(--line);margin-bottom:16px}
+.feat h3{font-size:16px;color:var(--gold);margin-bottom:8px}
+.feat p{font-size:13px;color:var(--dim);line-height:1.75}
+
+/* 步骤 */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;counter-reset:s}
+.stepx{position:relative;background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:26px 22px 22px;text-align:center}
+.stepx .num{width:34px;height:34px;line-height:34px;margin:0 auto 12px;border-radius:50%;background:linear-gradient(135deg,#FFD700,#c9a227);color:#1a1400;font-weight:900;font-size:15px}
+.stepx h4{font-size:14px;margin-bottom:6px}
+.stepx p{font-size:12px;color:var(--dim);line-height:1.7}
+
+/* 下载 */
+.dl{background:linear-gradient(160deg,rgba(255,215,0,.08),rgba(255,255,255,.02) 40%);border:1px solid var(--line);border-radius:26px;padding:48px 32px;text-align:center;position:relative;overflow:hidden}
+.dl::before{content:"";position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:480px;height:240px;background:radial-gradient(ellipse,rgba(255,215,0,.14),transparent 70%);pointer-events:none}
+.dl-cards{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+.dl-card{display:flex;align-items:center;gap:14px;padding:20px 26px;border-radius:18px;background:rgba(7,7,12,.6);border:1px solid var(--line);transition:.2s;text-align:left}
+.dl-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(255,215,0,.15);border-color:var(--gold2)}
+.dl-card .app-ico{font-size:30px}
+.dl-card b{font-size:16px;display:block}
+.dl-card span{font-size:12px;color:var(--dim);display:block;margin-top:3px}
+.dl-card .arr{margin-left:8px;color:var(--gold);font-size:18px}
+
+/* 商户 */
+.biz{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.biz-card{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:20px;padding:30px;display:flex;flex-direction:column;gap:10px}
+.biz-card h3{font-size:17px}
+.biz-card p{font-size:13px;color:var(--dim);line-height:1.7;flex:1}
+.biz-card a{align-self:flex-start;font-size:13px;font-weight:700;color:var(--gold);border:1px solid var(--line);padding:10px 20px;border-radius:11px;transition:.2s}
+.biz-card a:hover{background:rgba(255,215,0,.08);border-color:var(--gold2)}
+
+footer{border-top:1px solid rgba(255,255,255,.05);padding:36px 0 44px;text-align:center}
+footer .f-logo{display:inline-flex;align-items:center;gap:10px;margin-bottom:12px}
+footer img{width:26px;height:26px}
+footer p{font-size:12px;color:#55555f;line-height:2}
+.fade{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
+.fade.show{opacity:1;transform:none}
+@media(max-width:640px){.nav-links a:not(.nav-cta){display:none}.hero{padding:64px 0 48px}}
 </style>
 </head>
 <body>
-<div class="glow"></div>
-<div class="container">
-  <header>
-    <div class="logo-badge">♠</div>
-    <h1>天天扑克锦标赛</h1>
-    <div class="tagline">酒吧投币机式 SNG 赛事 · 扫码入座 · 自动开赛</div>
-    <div class="en">TIANTIAN POKER TOURNAMENT</div>
-  </header>
+<div class="glow glow-a"></div><div class="glow glow-b"></div><div class="glow glow-c"></div>
 
-  <div class="download" id="download">
-    <h2>下载 APP</h2>
-    <div class="sub">TV 显示屏装在酒吧电视/盒子上，玩家 APP 装在手机上</div>
-    <div class="btns">
-      <a class="btn btn-gold btn-text" href="/download/tv-display-v1.1.0.apk">
-        📺 TV 显示屏
-        <span class="ver">v1.1.0 · Android TV / 盒子</span>
-      </a>
-      <a class="btn btn-dark btn-text" href="/download/player-app-v1.1.0.apk">
-        📱 玩家 APP
-        <span class="ver">v1.1.0 · Android 7.0+</span>
-      </a>
+<nav>
+  <div class="nav-in">
+    <img src="/assets/logo.svg" alt="天天扑克锦标赛 Logo">
+    <div class="nav-name">天天扑克锦标赛<span>TIANTIAN POKER</span></div>
+    <div class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#how">流程</a>
+      <a href="/tv.html">观战</a>
+      <a href="/merchant/login.html">商户后台</a>
+      <a class="nav-cta" href="#download">下载 APP</a>
     </div>
   </div>
+</nav>
 
-  <div class="steps">
-    <div class="step"><div class="num">1</div><p>TV 装显示屏 APP，绑定桌号</p></div>
-    <div class="step"><div class="num">2</div><p>顾客扫码支付发起费</p></div>
-    <div class="step"><div class="num">3</div><p>满员自动开赛，TV 全程直播</p></div>
-    <div class="step"><div class="num">4</div><p>流水 70% 周结给店家</p></div>
-  </div>
+<div class="wrap">
+  <!-- HERO -->
+  <header class="hero">
+    <img src="/assets/logo.svg" alt="Logo">
+    <h1>天天扑克锦标赛</h1>
+    <div class="sub">酒吧投币机式 SNG 赛事 · 扫码入座 · 自动开赛</div>
+    <div class="en">TIANTIAN POKER TOURNAMENT</div>
+    <div class="hero-cta">
+      <a class="btn btn-gold" href="#download">⬇ 立即下载</a>
+      <a class="btn btn-ghost" href="/tv.html">🖥 网页观战</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>4</b><span>全球服务器节点</span></div>
+      <div class="stat"><b>2</b><span>收款通道 · 法币+USDT</span></div>
+      <div class="stat"><b>70%</b><span>店家流水分成</span></div>
+      <div class="stat"><b>0</b><span>店员组织成本</span></div>
+    </div>
+  </header>
 
-  <div class="cards">
-    <div class="card"><h3>♠ 投币机式 SNG</h3><p>扫码付发起费即激活牌桌，满员自动开赛。无需店员组织，一台电视就是一间扑克室。</p></div>
-    <div class="card"><h3>📺 电视直播级画面</h3><p>深色高级感牌桌、金色底池徽章、行动玩家金框提示，大屏观感对标 WSOP 转播。</p></div>
-    <div class="card"><h3>💰 双通道收款</h3><p>微信 / 支付宝（虎皮椒）+ USDT（币安 BSC 链），店家流水 70% 每周结算。</p></div>
-  </div>
+  <!-- 功能 -->
+  <section id="features" class="fade">
+    <div class="sec-head">
+      <div class="kick">FEATURES</div>
+      <h2>一台电视，就是一间扑克室</h2>
+      <p>从入座到开奖全自动，店家零运营负担</p>
+    </div>
+    <div class="grid">
+      <div class="feat"><div class="ico">♠</div><h3>投币机式 SNG</h3><p>顾客扫码付发起费即激活牌桌，满员自动开赛。无需店员组局，像投币机一样自助运转。</p></div>
+      <div class="feat"><div class="ico">📺</div><h3>电视直播级画面</h3><p>深色高级感牌桌、金色底池徽章、行动玩家金框提示，大屏观感对标 WSOP 转播。</p></div>
+      <div class="feat"><div class="ico">💰</div><h3>双通道收款</h3><p>微信 / 支付宝 + USDT（BSC 链）双通道，覆盖国内外客群，资金实时到账。</p></div>
+      <div class="feat"><div class="ico">🏪</div><h3>商户后台</h3><p>桌台状态、流水明细、分成结算一目了然，手机随时查看门店经营数据。</p></div>
+      <div class="feat"><div class="ico">🌏</div><h3>全球节点加速</h3><p>新加坡 / 东京 / 首尔 / 美国四节点部署，就近接入，跨国对局也低延迟。</p></div>
+      <div class="feat"><div class="ico">🛡</div><h3>稳定可靠</h3><p>多进程服务守护，断线自动重连恢复牌局，7×24 无人值守运行。</p></div>
+    </div>
+  </section>
 
-  <div class="links">
-    <a href="/tv.html">🖥 网页版观战</a>
-    <a href="/merchant/login.html">🏪 商户后台</a>
-  </div>
+  <!-- 流程 -->
+  <section id="how" class="fade">
+    <div class="sec-head">
+      <div class="kick">HOW IT WORKS</div>
+      <h2>四步开赛</h2>
+      <p>从装 APP 到分钱，全流程自动化</p>
+    </div>
+    <div class="steps">
+      <div class="stepx"><div class="num">1</div><h4>装 TV 显示屏</h4><p>酒吧电视或盒子安装 TV APP，扫码绑定桌号</p></div>
+      <div class="stepx"><div class="num">2</div><h4>顾客扫码入座</h4><p>玩家 APP 扫码支付发起费，自动占座</p></div>
+      <div class="stepx"><div class="num">3</div><h4>满员自动开赛</h4><p>牌局全程 TV 大屏直播，观战氛围拉满</p></div>
+      <div class="stepx"><div class="num">4</div><h4>流水周结</h4><p>店家流水 70% 每周自动结算，后台可查</p></div>
+    </div>
+  </section>
 
-  <footer>© 2026 天天扑克锦标赛 · poker.clawclaw.tech</footer>
+  <!-- 下载 -->
+  <section id="download" class="fade">
+    <div class="dl">
+      <div class="sec-head" style="margin-bottom:0">
+        <div class="kick">DOWNLOAD</div>
+        <h2>下载 APP</h2>
+        <p>TV 显示屏装在酒吧电视 / 盒子上，玩家 APP 装在手机上</p>
+      </div>
+      <div class="dl-cards">
+        <a class="dl-card" href="/download/tv-display-v1.1.0.apk">
+          <span class="app-ico">📺</span>
+          <span><b>TV 显示屏</b><span>v1.1.0 · Android TV / 盒子 · 1.6 MB</span></span>
+          <span class="arr">⬇</span>
+        </a>
+        <a class="dl-card" href="/download/player-app-v1.1.0.apk">
+          <span class="app-ico">📱</span>
+          <span><b>玩家 APP</b><span>v1.1.0 · Android 7.0+ · 28 MB</span></span>
+          <span class="arr">⬇</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 入口 -->
+  <section class="fade" style="padding-top:0">
+    <div class="biz">
+      <div class="biz-card">
+        <h3>🖥 网页版观战</h3>
+        <p>不用装 APP，浏览器打开即可观看牌桌实时画面，适合店内备用屏或玩家分享。</p>
+        <a href="/tv.html">进入观战 →</a>
+      </div>
+      <div class="biz-card">
+        <h3>🏪 商户后台</h3>
+        <p>店家登录查看桌台状态、流水明细与分成结算，经营数据一手掌握。</p>
+        <a href="/merchant/login.html">商户登录 →</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="f-logo"><img src="/assets/logo.svg" alt=""><b>天天扑克锦标赛</b></div>
+    <p>© 2026 天天扑克锦标赛 · TIANTIAN POKER TOURNAMENT<br>poker.clawclaw.tech</p>
+  </footer>
 </div>
+
+<script>
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target)}})},{threshold:.12});
+document.querySelectorAll('.fade').forEach(function(el){io.observe(el)});
+</script>
 </body>
 </html>
