@@ -402,31 +402,22 @@ class SNGManager {
       return;
     }
 
-    // 找下一个行动者
-    const nextIndex = this.nextActiveSeat(hand.actingIndex);
-    if (nextIndex === -1) {
+    // 检查是否一轮下注完成：所有可行动玩家本轮都已操作且下注额已匹配 currentBet。
+    // （旧逻辑依赖行动轮转回 lastRaiserIndex，若该玩家 allin/弃牌则永远转不回去 → 死循环）
+    const canActPlayers = this.players.filter(p => p.status === PLAYER_STATUS.PLAYING);
+    const actedIds = new Set(hand.actions.filter(a => a.action !== 'bet').map(a => a.playerId));
+    const roundComplete = canActPlayers.length > 0 && canActPlayers.every(p =>
+      actedIds.has(p.id) && this.getSeatCurrentBet(p.seatIndex) >= hand.currentBet
+    );
+    if (roundComplete) {
       this.advanceStage();
       return;
     }
 
-    // 检查是否一轮下注完成
-    // 当前玩家就是 lastRaiserIndex（BB preflop check 后回到自己）→ 一轮完成
-    if (hand.actingIndex === hand.lastRaiserIndex) {
+    // 找下一个行动者
+    const nextIndex = this.nextActiveSeat(hand.actingIndex);
+    if (nextIndex === -1) {
       this.advanceStage();
-      return;
-    }
-    // 下一个行动者回到 lastRaiserIndex → 检查该玩家是否已操作过
-    if (nextIndex === hand.lastRaiserIndex) {
-      const lastRaiserPlayer = this.players.find(p => p.seatIndex === hand.lastRaiserIndex);
-      const hasActed = lastRaiserPlayer && hand.actions.some(a => a.playerId === lastRaiserPlayer.id);
-      if (hasActed) {
-        this.advanceStage();
-        return;
-      }
-      // 还没操作过 → 让其操作
-      hand.actingIndex = nextIndex;
-      this.emit('turn_changed', { actingIndex: nextIndex, handNumber: hand.handNumber, pot: hand.pot, currentBet: hand.currentBet, seats: this.getSeatsSnapshot() });
-      this.startActionTimer(nextIndex);
       return;
     }
 
