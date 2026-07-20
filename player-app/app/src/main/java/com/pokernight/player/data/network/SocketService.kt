@@ -98,6 +98,8 @@ class SocketService(
 
     private fun registerListeners() {
         val s = socket ?: return
+        // 防御：同一 Socket 实例被复用时先清掉旧监听器，避免事件重复触发
+        s.off()
 
         s.on(Socket.EVENT_CONNECT) {
             Log.i(TAG, "Socket connected")

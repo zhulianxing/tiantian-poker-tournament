@@ -419,8 +419,10 @@ async function startTournament(tournamentId) {
         try {
           const rankings = data.rankings || [];
           for (const r of rankings) {
-            await query('UPDATE tournament_players SET chip_count = $1, final_rank = $2 WHERE tournament_id = $3 AND player_id = $4',
-              [r.chips || 0, r.rank, tournamentId, r.playerId]);
+            // rank 1 记为 winner，其余记为 eliminated（此前只更新筹码和名次，status 永远停在 waiting）
+            const finalStatus = r.rank === 1 ? 'winner' : 'eliminated';
+            await query('UPDATE tournament_players SET chip_count = $1, final_rank = $2, status = $3 WHERE tournament_id = $4 AND player_id = $5',
+              [r.chips || 0, r.rank, finalStatus, tournamentId, r.playerId]);
           }
           await query('UPDATE tournaments SET status = $1, finished_at = NOW() WHERE id = $2',
             [TOURNAMENT_STATUS.FINISHED, tournamentId]);

@@ -42,6 +42,9 @@ object NetworkProvider {
     fun createSocket(token: String?): Socket {
         val options = IO.Options().apply {
             transports = arrayOf(WebSocket.NAME)
+            // IO.socket 按 URI 缓存实例，不强制新建会让多个 SocketService
+            // 在同一 Socket 上重复注册监听器（每个事件收到 N 次）
+            forceNew = true
             reconnection = true
             reconnectionAttempts = 0 // 0 = unlimited; app must recover after doze/background
             reconnectionDelay = 1000

@@ -171,7 +171,15 @@ class GameViewModel : ViewModel() {
 
     // ─── Table & Tournament ───
 
+    private var tableStatusCode: String? = null
+
     fun fetchTableStatus(code: String) {
+        // 换了桌号才清空旧数据：避免残留的上场赛事状态（如 started）触发大厅自动跳牌局；
+        // 同桌号轮询时保留旧数据，防止界面每 5 秒闪加载
+        if (tableStatusCode != code) {
+            tableStatusCode = code
+            _tableStatus.value = null
+        }
         viewModelScope.launch {
             try {
                 val status = api.getTableStatus(code)
@@ -276,6 +284,9 @@ class GameViewModel : ViewModel() {
         }
         val token = AuthManager.getToken()
         android.util.Log.i("GameViewModel", "connectSocket: token=${if (token != null) token.take(20) + "..." else "null"}, tableCode=$tableCode")
+        // 新 socket = 新牌局上下文：清掉上一场残留的牌局状态（旧底牌/底池/阶段），
+        // 防止大厅/牌局页被过期数据误导（服务器 table_state 会立刻重新同步）
+        _gameState.value = GameState(tableCode = tableCode)
         socketService = SocketService(
             onStateUpdate = { state -> _gameState.value = state },
             onEvent = { event, data ->
