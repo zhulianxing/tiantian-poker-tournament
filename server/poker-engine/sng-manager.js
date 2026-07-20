@@ -60,10 +60,11 @@ class SNGManager {
       if (this.blindLevel >= 30) { console.log('[SNG] Blind level capped at 30'); return; }
       this.blindLevel++;
       console.log(`[SNG] Blind level up to ${this.blindLevel}`);
+      const { sb, bb } = this.getCurrentBlinds();
       this.emit('blind_level_up', {
         level: this.blindLevel,
-        sb: SNG_DEFAULTS.START_BLIND_SB * Math.pow(2, this.blindLevel - 1),
-        bb: SNG_DEFAULTS.START_BLIND_BB * Math.pow(2, this.blindLevel - 1),
+        sb,
+        bb,
       });
     }, interval * 1000);
   }
@@ -310,10 +311,13 @@ class SNGManager {
         result.success = true;
         break;
 
-      case ACTIONS.CHECK:
-        if (hand.currentBet > 0) return { error: 'cannot check, there is a bet' };
+      case ACTIONS.CHECK: {
+        // 与本轮自己已下注额比较：全员跟注到平点时大盲应能过牌
+        const myBetForCheck = this.getSeatCurrentBet(player.seatIndex);
+        if (hand.currentBet > myBetForCheck) return { error: 'cannot check, there is a bet' };
         result.success = true;
         break;
+      }
 
       case ACTIONS.CALL: {
         const alreadyBet = this.getSeatCurrentBet(player.seatIndex);
@@ -651,13 +655,17 @@ class SNGManager {
       handNumber: hand.handNumber,
       winners: winners.map(w => ({
         playerId: w.player.id,
+        seatIndex: w.player.seatIndex,
         handName: w.evaluation.name,
         cards: w.evaluation.cards,
+        holeCards: hand.holeCards[w.player.id] || [],
       })),
       allResults: results.map(r => ({
         playerId: r.player.id,
+        seatIndex: r.player.seatIndex,
         handName: r.evaluation.name,
         cards: r.evaluation.cards,
+        holeCards: hand.holeCards[r.player.id] || [],
       })),
       pot: hand.pot,
       winAmount: baseAmount,
@@ -684,6 +692,7 @@ class SNGManager {
         handNumber: hand.handNumber,
         winnerId: winner.id,
         pot: hand.pot,
+        winAmount: hand.pot,
         showdown: false,
         seats: this.getSeatsSnapshot(),
       });
@@ -695,6 +704,8 @@ class SNGManager {
         winnerId: showdownWinners[0].player.id,
         winners: showdownWinners.map(w => w.player.id),
         pot: hand.pot,
+        winAmount: Math.floor(hand.pot / showdownWinners.length),
+        handName: showdownWinners[0].evaluation.name,
         showdown: true,
         seats: this.getSeatsSnapshot(),
       });

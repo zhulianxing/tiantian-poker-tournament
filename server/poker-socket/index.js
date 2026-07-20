@@ -122,7 +122,7 @@ io.on('connection', (socket) => {
           bb: tournament ? Math.min(Math.floor(tournament.start_blind * 2 * Math.pow(2, gameBlind - 1)), 200000000) : 20,
           blindLevel: gameBlind,
           pot: gamePot,
-          communityCards: [],
+          communityCards: activeGame?.currentHand?.revealedCommunity || [],
           actingIndex: gameActing,
           dealerIndex: gameDealer,
           handNumber: gameHand,
