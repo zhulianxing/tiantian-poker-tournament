@@ -48,9 +48,9 @@ function renderConnect() {
     <div class="connect-screen">
       <h1 style="color:#FFD700;font-size:48px;margin-bottom:40px;">🃏 天天扑克锦标赛</h1>
       <p style="color:#aaa;margin-bottom:20px;">输入桌号连接牌桌</p>
-      <input id="codeInput" maxlength="6" placeholder="PNDEMO" value="" />
+      <input id="codeInput" maxlength="6" placeholder="SNGT01" value="" />
       <button onclick="connect()">连接</button>
-      <p style="color:#666;margin-top:30px;font-size:14px;">测试桌号: PNDEMO</p>
+      <p style="color:#666;margin-top:30px;font-size:14px;">测试桌号: SNGT01</p>
     </div>
   `;
   document.getElementById('codeInput').focus();
@@ -62,29 +62,44 @@ function renderConnect() {
 function connect() {
   tableCode = document.getElementById('codeInput').value.toUpperCase();
   if (!tableCode) return;
-  
-  socket = io(SERVER, { path: '/socket.io/' });
+
+  // 服务端要求匿名围观连接必须带 role=tv，否则握手被拒绝（表现为"点了没反应"）
+  socket = io(SERVER, { path: '/socket.io/', query: { role: 'tv' } });
   socket.on('connect', () => {
     socket.emit('join_table', tableCode);
     renderTable();
   });
+  socket.on('connect_error', (err) => {
+    // 连接失败要看得见，不能静默
+    const el = document.querySelector('.connect-screen p');
+    if (el) { el.textContent = '连接失败: ' + err.message; el.style.color = '#E53935'; }
+  });
   socket.on('disconnect', () => {
     document.getElementById('app').innerHTML = '<div class="connect-screen"><h1 style="color:#E53935;">已断线，重连中...</h1></div>';
   });
-  
+
   // 事件处理
+  socket.on('table_state', (d) => {
+    // 入座/重连后的全量状态：渲染座位、盲注、底池
+    if (d.seats) renderSeats(d.seats);
+    if (d.sb != null) updateBlinds({ sb: d.sb, bb: d.bb, level: d.blindLevel || 1 });
+    if (d.pot != null) updatePot(d.pot);
+    if (d.phase) updateStatus(d.phase === 'started' ? '比赛进行中' : d.phase === 'registering' ? '报名中，等待开赛...' : '等待赛事开始', d);
+  });
+  socket.on('seat_joined', (d) => { if (d.seats) renderSeats(d.seats); });
   socket.on('tournament_activated', (d) => updateStatus('等待玩家入座...', d));
   socket.on('countdown_tick', (d) => updateCountdown(d.remaining));
-  socket.on('tournament_started', (d) => updateStatus('比赛开始!', d));
+  socket.on('tournament_started', (d) => { updateStatus('比赛开始!', d); if (d.seats) renderSeats(d.seats); });
   socket.on('new_hand', (d) => updateStatus(`第 ${d.handNumber} 手`, d));
-  socket.on('hand_started', (d) => { updateStatus(`第 ${d.handNumber} 手 - ${d.stage}`, d); updatePot(d.pot); });
-  socket.on('stage_changed', (d) => { updateStage(d); });
-  socket.on('turn_changed', (d) => { updateActing(d.actingIndex); });
-  socket.on('action_result', (d) => { updateAction(d); });
+  socket.on('hand_started', (d) => { updateStatus(`第 ${d.handNumber} 手 - ${d.stage}`, d); updatePot(d.pot); if (d.seats) renderSeats(d.seats); });
+  socket.on('stage_changed', (d) => { updateStage(d); if (d.seats) renderSeats(d.seats); });
+  socket.on('turn_changed', (d) => { updateActing(d.actingIndex); if (d.seats) renderSeats(d.seats); });
+  socket.on('action_result', (d) => { updateAction(d); updatePot(d.pot); if (d.seats) renderSeats(d.seats); });
   socket.on('showdown', (d) => { updateShowdown(d); });
-  socket.on('hand_result', (d) => { updateStatus(`第 ${d.handNumber} 手结束 - 赢家获得 ${d.pot}`, d); });
+  socket.on('hand_result', (d) => { updateStatus(`第 ${d.handNumber} 手结束 - 赢家获得 ${d.pot}`, d); if (d.seats) renderSeats(d.seats); });
+  socket.on('player_eliminated', (d) => { if (d.seats) renderSeats(d.seats); });
   socket.on('blind_level_up', (d) => { updateBlinds(d); });
-  socket.on('tournament_finished', (d) => { updateStatus('比赛结束', d); });
+  socket.on('tournament_finished', (d) => { updateStatus('比赛结束', d); if (d.seats) renderSeats(d.seats); });
 }
 
 function renderTable() {
