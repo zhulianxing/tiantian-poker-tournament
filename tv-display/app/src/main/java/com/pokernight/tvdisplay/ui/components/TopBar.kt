@@ -30,7 +30,7 @@ fun TopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(64.dp)
+            .height(52.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(SeatBg)
             .border(1.dp, SeatBorder, RoundedCornerShape(12.dp))
@@ -38,65 +38,65 @@ fun TopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Left: Table code + stage
+        // Left: 桌号 + 阶段
         Row(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             InfoChip(
-                label = "Table",
+                label = "桌号",
                 value = state.tableCode.ifEmpty { "---" },
                 valueColor = GoldAccent,
             )
             InfoChip(
-                label = "Stage",
-                value = state.stage.uppercase().ifEmpty { state.phase.uppercase() },
+                label = "阶段",
+                value = if (state.stage.isNotEmpty()) stageLabel(state.stage) else phaseLabel(state.phase),
                 valueColor = TextPrimary,
             )
         }
 
-        // Center: Blind level + Pot
+        // Center: 盲注级别 + 手牌号
         Row(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             InfoChip(
-                label = "Blind Lv",
-                value = "${state.blindLevel}",
+                label = "盲注",
+                value = "L${state.blindLevel}",
                 valueColor = GoldAccent,
             )
             InfoChip(
-                label = "SB/BB",
+                label = "小盲/大盲",
                 value = "${state.sb}/${state.bb}",
                 valueColor = ChipGreen,
             )
             InfoChip(
-                label = "Hand",
+                label = "手牌",
                 value = "#${state.handNumber}",
                 valueColor = TextPrimary,
             )
         }
 
-        // Right: Players + Countdown
+        // Right: 玩家数 + 倒计时 + 底池
         Row(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             InfoChip(
-                label = "Players",
+                label = "玩家",
                 value = "${state.activePlayerCount}/${state.totalPlayerCount}",
                 valueColor = ChipGreen,
             )
             if (state.countdown > 0) {
                 InfoChip(
-                    label = "Starts in",
+                    label = "开赛",
                     value = "${state.countdown}s",
                     valueColor = RedAction,
                 )
             }
             if (state.pot > 0) {
                 InfoChip(
-                    label = "Pot",
+                    label = "底池",
                     value = formatPot(state.pot),
                     valueColor = GoldAccent,
                 )
@@ -134,4 +134,22 @@ private fun formatPot(pot: Int): String {
         pot >= 1_000 -> "${pot / 1_000}K"
         else -> pot.toString()
     }
+}
+
+/** 牌局阶段英文码 → 中文标签 */
+internal fun stageLabel(stage: String): String = when (stage.lowercase()) {
+    "preflop", "pre-flop", "pre_flop" -> "翻牌前"
+    "flop" -> "翻牌圈"
+    "turn" -> "转牌圈"
+    "river" -> "河牌圈"
+    "showdown" -> "摊牌"
+    else -> stage.uppercase()
+}
+
+/** 赛事阶段英文码 → 中文标签 */
+internal fun phaseLabel(phase: String): String = when (phase.lowercase()) {
+    "registering" -> "报名中"
+    "started", "playing" -> "进行中"
+    "finished" -> "已结束"
+    else -> phase.uppercase()
 }

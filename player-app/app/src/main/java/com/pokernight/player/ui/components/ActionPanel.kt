@@ -22,9 +22,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.pokernight.player.ui.theme.ActionBlue
+import com.pokernight.player.ui.theme.ActionFoldGray
+import com.pokernight.player.ui.theme.ActionAllInRed
 import com.pokernight.player.ui.theme.ActionGreen
-import com.pokernight.player.ui.theme.ActionRed
+import com.pokernight.player.ui.theme.ActionOrange
 import com.pokernight.player.ui.theme.BgElevated
 import com.pokernight.player.ui.theme.DisabledGray
 import com.pokernight.player.ui.theme.Gold
@@ -41,6 +42,7 @@ fun ActionPanel(
     callAmount: Int,
     minRaise: Int,
     raiseAmount: Int,
+    raiseConfirm: Boolean = false,
     onRaiseAmountChange: (Int) -> Unit,
     onFold: () -> Unit,
     onCheck: () -> Unit,
@@ -77,7 +79,7 @@ fun ActionPanel(
         } else {
             ActionButton(
                 text = "弃牌",
-                color = ActionRed,
+                color = ActionFoldGray,
                 enabled = true,
                 onClick = onFold,
                 modifier = Modifier.weight(1f),
@@ -92,8 +94,8 @@ fun ActionPanel(
             )
             Spacer(Modifier.width(8.dp))
             ActionButton(
-                text = "加注 $raiseAmount",
-                color = ActionBlue,
+                text = if (raiseConfirm) "确认 $raiseAmount" else "加注",
+                color = ActionOrange,
                 enabled = raiseAmount in minRaise..myChips,
                 onClick = onRaise,
                 modifier = Modifier.weight(1f),
@@ -101,8 +103,7 @@ fun ActionPanel(
             Spacer(Modifier.width(8.dp))
             ActionButton(
                 text = "全下",
-                color = Gold,
-                contentColor = Color(0xFF1A1400),
+                color = ActionAllInRed,
                 enabled = myChips > 0,
                 onClick = onAllIn,
                 modifier = Modifier.weight(1f),

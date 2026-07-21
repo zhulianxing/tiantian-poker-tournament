@@ -33,13 +33,16 @@ fun PokerCardView(
     modifier: Modifier = Modifier,
     faceDown: Boolean = false,
     highlighted: Boolean = false,
+    cardWidth: androidx.compose.ui.unit.Dp = 64.dp,
+    cardHeight: androidx.compose.ui.unit.Dp = 90.dp,
 ) {
     val isCardBack = faceDown || card == null
+    val scale = cardHeight.value / 90f
 
     Box(
         modifier = modifier
-            .width(64.dp)
-            .height(90.dp)
+            .width(cardWidth)
+            .height(cardHeight)
             .shadow(
                 elevation = if (highlighted) 6.dp else 3.dp,
                 shape = RoundedCornerShape(8.dp),
@@ -68,11 +71,11 @@ fun PokerCardView(
                 // Outer diamond
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size((48 * scale).dp)
                         .background(Color(0xFF1E3A5F), RoundedCornerShape(4.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("♠", color = Color(0xFF2A5080), fontSize = 28.sp)
+                    Text("♠", color = Color(0xFF2A5080), fontSize = (28 * scale).sp)
                 }
                 // Center dot
                 Box(
@@ -91,7 +94,7 @@ fun PokerCardView(
             Text(
                 text = c.displayRank,
                 color = cardColor,
-                fontSize = 16.sp,
+                fontSize = (16 * scale).sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -102,7 +105,7 @@ fun PokerCardView(
             Text(
                 text = c.suitSymbol,
                 color = cardColor,
-                fontSize = 28.sp,
+                fontSize = (28 * scale).sp,
                 modifier = Modifier.align(Alignment.Center),
             )
 
@@ -110,7 +113,7 @@ fun PokerCardView(
             Text(
                 text = c.displayRank,
                 color = cardColor,
-                fontSize = 16.sp,
+                fontSize = (16 * scale).sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)

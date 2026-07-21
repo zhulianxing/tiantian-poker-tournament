@@ -290,6 +290,30 @@ fun TableJoinScreen(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
+
+                    // 旁观入口：赛事进行中或已满座时，只进牌局页观看，不占座不操作
+                    val canSpectate = tournament.status in listOf("started", "active", "running") ||
+                            tournament.playerCount >= tournament.maxPlayers
+                    if (canSpectate && !uiState.isLoading) {
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { onJoinSuccess(tableCode) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2A2A38),
+                                contentColor = Gold,
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                        ) {
+                            Text(
+                                text = "👁 旁观",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
                 }
             }
         }

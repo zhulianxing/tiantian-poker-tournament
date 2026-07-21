@@ -31,7 +31,7 @@ fun BottomBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(80.dp)
+            .height(56.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(SeatBg)
             .border(1.dp, SeatBorder, RoundedCornerShape(12.dp))
@@ -45,14 +45,14 @@ fun BottomBar(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = "Hand History",
+                text = "牌局记录",
                 color = GoldAccent,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
             if (handHistory.isEmpty()) {
                 Text(
-                    text = "No history yet",
+                    text = "暂无记录",
                     color = TextTertiary,
                     fontSize = 12.sp,
                 )
@@ -78,7 +78,7 @@ fun BottomBar(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "Disconnect",
+                text = "断开连接",
                 color = RedAction,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,

@@ -166,6 +166,41 @@ app.post('/api/v1/auth/login', async (req, res) => {
 });
 
 // ============================================================
+// Agent 零认证（昵称即账号，供 AI agent 快速参赛）
+// ============================================================
+app.post('/api/v1/auth/agent', async (req, res) => {
+  const { nickname } = req.body || {};
+  if (!nickname || typeof nickname !== 'string') return res.status(400).json({ error: 'missing nickname' });
+  const nick = nickname.trim();
+  if (nick.length < 2 || nick.length > 30) return res.status(400).json({ error: 'nickname must be 2-30 chars' });
+
+  // Bot/AutoBot 前缀会被 SNG 引擎当作机器人代打（poker-socket 按昵称判定 isBot），agent 必须自己决策
+  if (/^bot/i.test(nick) || /^autobot/i.test(nick)) {
+    return res.status(400).json({ error: 'nicknames starting with Bot/AutoBot are auto-played by the engine; choose another nickname' });
+  }
+
+  // 幂等：email 约定为 agent:<nickname>@agent.local，已存在直接登录，不存在自动建号
+  const agentEmail = `agent:${nick}@agent.local`;
+  try {
+    const exist = await query('SELECT id, nickname, email, avatar FROM players WHERE email = $1', [agentEmail]);
+    let player = exist.rows[0];
+    if (!player) {
+      const created = await query(
+        'INSERT INTO players (nickname, email, avatar) VALUES ($1, $2, $3) RETURNING id, nickname, email, avatar',
+        [nick, agentEmail, '🤖']
+      );
+      player = created.rows[0];
+    }
+    const token = jwt.sign({ id: player.id, nickname: player.nickname }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ player, token });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'nickname taken by a non-agent account' });
+    console.error('[Auth] agent error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
 // 牌桌
 // ============================================================
 

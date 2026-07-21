@@ -85,6 +85,22 @@ data class Card(
     val value: Int = 0,
 )
 
+/** 每手结果（hand_result 事件），用于结果浮层；下一手开始清除 */
+data class HandResultInfo(
+    val winnerId: String = "",
+    val winnerName: String = "",
+    val winAmount: Int = 0,
+    val handName: String = "",
+)
+
+/** 赛事最终排名（tournament_finished 事件的 rankings），用于结算浮层 */
+data class FinalRankInfo(
+    val playerId: String = "",
+    val nickname: String = "",
+    val rank: Int = 0,
+    val chips: Int = 0,
+)
+
 data class GameState(
     val tableCode: String = "",
     val tournamentId: String = "",
@@ -105,6 +121,16 @@ data class GameState(
     val myCurrentBet: Int = 0,
     val isMyTurn: Boolean = false,
     val countdown: Int = 0,
+    val stage: String = "",
+    /** 操作流水（最新在末尾），最多保留 3 条 */
+    val actionLog: List<String> = emptyList(),
+    /** 轮到我时的操作时限（毫秒），由 action_timer_started 下发 */
+    val turnTimeoutMs: Int = 15000,
+    val handResult: HandResultInfo? = null,
+    /** 我被淘汰时的最终名次；null = 未淘汰 */
+    val myEliminatedRank: Int? = null,
+    /** 赛事结束后的最终排名表（tournament_finished 下发），空 = 未结束 */
+    val finalRankings: List<FinalRankInfo> = emptyList(),
 )
 
 data class SeatInfo(

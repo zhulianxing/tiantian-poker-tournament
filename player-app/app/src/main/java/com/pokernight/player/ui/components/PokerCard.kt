@@ -29,17 +29,18 @@ import com.pokernight.player.ui.theme.GoldDark
 import com.pokernight.player.ui.theme.SuitBlack
 import com.pokernight.player.ui.theme.SuitRed
 
+// 服务端直接下发 Unicode 花色字符（♠♥♦♣），同时兼容英文花色名
 private fun suitSymbol(suit: String): String = when (suit.lowercase()) {
-    "hearts" -> "♥"
-    "diamonds" -> "♦"
-    "clubs" -> "♣"
-    "spades" -> "♠"
+    "hearts", "h", "♥" -> "♥"
+    "diamonds", "d", "♦" -> "♦"
+    "clubs", "c", "♣" -> "♣"
+    "spades", "s", "♠" -> "♠"
     else -> "?"
 }
 
 private fun suitColor(suit: String): Color = when (suit.lowercase()) {
-    "hearts", "diamonds" -> SuitRed
-    "clubs", "spades" -> SuitBlack
+    "hearts", "diamonds", "h", "d", "♥", "♦" -> SuitRed
+    "clubs", "spades", "c", "s", "♣", "♠" -> SuitBlack
     else -> DisabledGray
 }
 

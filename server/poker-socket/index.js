@@ -202,7 +202,7 @@ async function handleDisconnect(socket) {
 
   // 通知牌桌
   const tResult = await query(
-    `SELECT t.code FROM tournaments t JOIN tables tbl ON t.table_id = tbl.id WHERE t.id = $1`,
+    `SELECT tbl.code FROM tournaments t JOIN tables tbl ON t.table_id = tbl.id WHERE t.id = $1`,
     [tournamentId]
   );
   const tableCode = tResult.rows[0]?.code;

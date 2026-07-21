@@ -110,6 +110,8 @@ class TableViewModel(application: Application) : AndroidViewModel(application) {
                 stage = "",
                 handNumber = 0,
                 countdown = 0,
+                winnerBanner = null,
+                showdownHands = emptyMap(),
             )
         }
     }
@@ -165,6 +167,8 @@ class TableViewModel(application: Application) : AndroidViewModel(application) {
                         actingIndex = actingIndex,
                         seats = seats,
                         communityCards = emptyList(), // Clear community cards on new hand
+                        winnerBanner = null,          // 清除上一手赢家横幅
+                        showdownHands = emptyMap(),   // 清除上一手摊牌明牌
                     )
                 }
             }
@@ -275,14 +279,36 @@ class TableViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 }
+                // 摊牌明牌：seatIndex → 底牌（用于座位旁 reveal）
+                val showdownHands = mutableMapOf<Int, List<Card>>()
+                val allResults = data.optJSONArray("allResults")
+                if (allResults != null) {
+                    for (i in 0 until allResults.length()) {
+                        val r = allResults.optJSONObject(i) ?: continue
+                        val seatIndex = r.optInt("seatIndex", -1)
+                        val holeCards = parseCards(r.optJSONArray("holeCards"))
+                        if (seatIndex >= 0 && holeCards.isNotEmpty()) {
+                            showdownHands[seatIndex] = holeCards
+                        }
+                    }
+                }
                 val communityCards = parseCards(data.optJSONArray("communityCards"))
-                _uiState.update { it.copy(stage = Stage.SHOWDOWN, pot = pot, communityCards = communityCards.ifEmpty { it.communityCards }) }
+                _uiState.update {
+                    it.copy(
+                        stage = Stage.SHOWDOWN,
+                        pot = pot,
+                        communityCards = communityCards.ifEmpty { it.communityCards },
+                        showdownHands = showdownHands.ifEmpty { it.showdownHands },
+                    )
+                }
             }
 
             ServerEvent.HAND_RESULT -> {
                 val handNumber = data.optInt("handNumber", 0)
                 val winnerId = data.optString("winnerId", "")
                 val pot = data.optInt("pot", 0)
+                val winAmount = data.optInt("winAmount", pot)
+                val handName = data.optString("handName", "")
                 val seats = parseSeats(data.optJSONArray("seats"))
 
                 _uiState.update { state ->
@@ -299,16 +325,22 @@ class TableViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                     }
+                    val winnerName = updatedSeats.find { it.playerId == winnerId }?.nickname ?: winnerId
                     state.copy(
                         seats = updatedSeats,
                         pot = 0,
                         currentBet = 0,
                         actingIndex = -1,
+                        winnerBanner = if (winnerName.isNotEmpty()) {
+                            WinnerBanner(winnerName = winnerName, winAmount = winAmount, handName = handName)
+                        } else {
+                            null
+                        },
                     )
                 }
 
                 val winnerName = _uiState.value.seats.find { it.playerId == winnerId }?.nickname ?: winnerId
-                addHistory("Hand #$handNumber won by $winnerName (Pot: $pot)")
+                addHistory("第${handNumber}手：$winnerName 赢得底池 $pot")
             }
 
             ServerEvent.PLAYER_ELIMINATED -> {
@@ -458,14 +490,14 @@ class TableViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun buildActionText(action: String, amount: Int): String {
         return when (action.lowercase()) {
-            "fold" -> "Fold"
-            "check" -> "Check"
-            "call" -> if (amount > 0) "Call $amount" else "Call"
-            "raise" -> "Raise to $amount"
-            "bet" -> "Bet $amount"
-            "allin", "all-in", "all_in" -> "All-In $amount"
-            "small_blind" -> "SB $amount"
-            "big_blind" -> "BB $amount"
+            "fold" -> "弃牌"
+            "check" -> "过牌"
+            "call" -> if (amount > 0) "跟注 $amount" else "跟注"
+            "raise" -> "加注到 $amount"
+            "bet" -> "下注 $amount"
+            "allin", "all-in", "all_in" -> "全下 $amount"
+            "small_blind" -> "小盲 $amount"
+            "big_blind" -> "大盲 $amount"
             else -> "$action $amount".trim()
         }
     }

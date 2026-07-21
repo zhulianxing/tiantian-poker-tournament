@@ -66,12 +66,19 @@ class SocketService {
 
                 override fun onMessage(msg: String?) {
                     if (msg.isNullOrEmpty()) return
+                    // 旧连接的迟到事件直接丢弃，防止污染新连接的状态
+                    if (wsClient !== this) return
                     Log.i(TAG, "RAW[${"$msg".take(200)}]") 
                     handleEngineIOMessage(msg)
                 }
 
                 override fun onClose(code: Int, reason: String?, remote: Boolean) {
                     Log.i(TAG, "onClose: $code $reason remote=$remote")
+                    // 只响应当前连接的关闭：旧连接的 onClose 会把新连接的 UI 误置为未连接
+                    if (wsClient !== this) {
+                        Log.i(TAG, "stale client closed, ignore")
+                        return
+                    }
                     handleDisconnect()
                 }
 

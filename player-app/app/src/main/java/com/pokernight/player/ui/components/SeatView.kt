@@ -132,6 +132,17 @@ fun SeatView(
                 fontWeight = FontWeight.Bold,
             )
 
+            // 本轮下注徽标（收池/新阶段时服务端快照清零）
+            if (seat.currentBet > 0) {
+                Text(
+                    text = "下注 ${seat.currentBet}",
+                    fontSize = 9.sp,
+                    color = Gold,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+            }
+
             if (seat.lastAction.isNotEmpty()) {
                 Text(
                     text = seat.lastAction,

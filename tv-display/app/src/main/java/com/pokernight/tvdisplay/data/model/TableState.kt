@@ -1,5 +1,12 @@
 package com.pokernight.tvdisplay.data.model
 
+/** 赢家横幅信息（hand_result 后展示，下一手开始清除） */
+data class WinnerBanner(
+    val winnerName: String = "",
+    val winAmount: Int = 0,
+    val handName: String = "",
+)
+
 data class TableState(
     val tableCode: String = "",
     val phase: String = "idle",
@@ -20,6 +27,9 @@ data class TableState(
     val rankings: List<Map<String, Any>> = emptyList(),
     val connected: Boolean = false,
     val errorMessage: String = "",
+    val winnerBanner: WinnerBanner? = null,
+    /** 摊牌时各座位的明牌底牌：seatIndex → 2 张底牌 */
+    val showdownHands: Map<Int, List<Card>> = emptyMap(),
 ) {
     val isRegistering: Boolean
         get() = phase == "registering"

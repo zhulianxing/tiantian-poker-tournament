@@ -28,6 +28,9 @@ val GoldSoft = Color(0x33FFD700)        // 20% 金（光晕）
 val ActionGreen = Color(0xFF46A758)
 val ActionRed = Color(0xFFE5484D)
 val ActionBlue = Color(0xFF3E8AED)
+val ActionOrange = Color(0xFFF0A020)    // 加注
+val ActionFoldGray = Color(0xFF8A94A6)  // 弃牌
+val ActionAllInRed = Color(0xFFD4382C)  // 全下
 
 // 中性色
 val DisabledGray = Color(0xFF55555F)

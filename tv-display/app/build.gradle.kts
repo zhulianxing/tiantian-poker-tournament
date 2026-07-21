@@ -41,6 +41,11 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
         }
+        debug {
+            // 与正式包共存真机调试：包名加 .debug 后缀，避免签名冲突覆盖安装
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
     }
 
     compileOptions {

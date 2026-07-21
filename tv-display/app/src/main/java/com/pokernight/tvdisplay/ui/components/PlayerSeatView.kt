@@ -32,6 +32,8 @@ import com.pokernight.tvdisplay.ui.theme.*
 fun PlayerSeatView(
     seat: PlayerSeat,
     modifier: Modifier = Modifier,
+    seatWidth: androidx.compose.ui.unit.Dp = 200.dp,
+    seatHeight: androidx.compose.ui.unit.Dp = 100.dp,
 ) {
     val isEmpty = seat.status == PlayerStatus.EMPTY
     val isEliminated = seat.status == PlayerStatus.ELIMINATED
@@ -80,18 +82,18 @@ fun PlayerSeatView(
 
     Box(
         modifier = modifier
-            .width(200.dp)
-            .height(100.dp)
+            .width(seatWidth)
+            .height(seatHeight)
             .alpha(seatAlpha)
             .clip(RoundedCornerShape(12.dp))
             .background(SeatBg)
             .border(borderWidth, borderColor, RoundedCornerShape(12.dp))
-            .padding(12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         if (isEmpty) {
             Text(
-                text = "Empty",
+                text = "空位",
                 color = TextTertiary,
                 fontSize = 14.sp,
             )
@@ -116,7 +118,7 @@ fun PlayerSeatView(
                             fontSize = 18.sp,
                         )
                         Text(
-                            text = seat.nickname.ifEmpty { "Player ${seat.seatIndex + 1}" },
+                            text = seat.nickname.ifEmpty { "玩家${seat.seatIndex + 1}" },
                             color = TextPrimary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
@@ -155,7 +157,7 @@ fun PlayerSeatView(
                     )
                     if (seat.currentBet > 0) {
                         Text(
-                            text = "Bet: ${seat.currentBet}",
+                            text = "下注 ${seat.currentBet}",
                             color = GoldAccent,
                             fontSize = 14.sp,
                         )
@@ -174,10 +176,10 @@ fun PlayerSeatView(
                 } else if (seat.status != PlayerStatus.PLAYING) {
                     Text(
                         text = when (seat.status) {
-                            PlayerStatus.WAITING -> "Waiting"
-                            PlayerStatus.FOLDED -> "Folded"
-                            PlayerStatus.ALL_IN -> "All-In"
-                            PlayerStatus.ELIMINATED -> "Eliminated"
+                            PlayerStatus.WAITING -> "等待中"
+                            PlayerStatus.FOLDED -> "已弃牌"
+                            PlayerStatus.ALL_IN -> "全下"
+                            PlayerStatus.ELIMINATED -> "淘汰"
                             else -> ""
                         },
                         color = statusColor,

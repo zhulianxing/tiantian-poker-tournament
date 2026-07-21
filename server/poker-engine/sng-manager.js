@@ -27,6 +27,8 @@ class SNGManager {
     this.dealerIndex = 0; // 庄家位置（座位号）
     this.actionTimer = null; // 操作超时定时器
     this.actionTimeout = (tournament.action_timeout || SNG_DEFAULTS.ACTION_TIMEOUT) * 1000;
+    this.botActionDelayMs = Number(process.env.BOT_ACTION_MS) || 3000; // Bot 行动间隔（演示节奏用）
+    this.eliminationOrder = []; // 淘汰时间顺序（playerId 先淘汰在前），用于最终排名
   }
 
   /**
@@ -84,6 +86,14 @@ class SNGManager {
    */
   startNewHand() {
     if (this.isFinished) return;
+    // ALLIN 只是单手状态：新一手开始时恢复为 PLAYING。
+    // 否则 allin 幸存者永远不收盲注、不能行动（nextActiveSeat 只看 PLAYING），
+    // 一旦桌上没有 PLAYING 玩家就会陷入 0 底池无限空转。
+    for (const p of this.players) {
+      if (p.status === PLAYER_STATUS.ALLIN) {
+        p.status = PLAYER_STATUS.PLAYING;
+      }
+    }
     // 检查赛事是否结束
     const activePlayers = this.getActivePlayers();
     if (activePlayers.length <= 1) {
@@ -440,86 +450,84 @@ class SNGManager {
     const player = this.players.find(p => p.seatIndex === seatIndex);
     if (!player) return;
 
+    // Bot 用短间隔（默认 3 秒，BOT_ACTION_MS 可调）；真人用赛事配置的超时自动弃牌
+    const delay = player.isBot ? this.botActionDelayMs : this.actionTimeout;
+
     this.actionTimer = setTimeout(() => {
-      // Bot auto-action: smarter strategy
       if (player.isBot) {
         const hand = this.currentHand;
         if (!hand) return;
         const alreadyBet = this.getSeatCurrentBet(seatIndex);
         const toCall = Math.max(0, hand.currentBet - alreadyBet);
-        const potOdds = toCall > 0 ? toCall / (hand.pot + toCall) : 0;
-        const chipRatio = player.chipCount / 1000; // 相对筹码
-        
-        // Bot 策略：
-        // - 可以 check → 80% check, 20% raise（偷池）
-        // - 需要跟注：根据底池赔率和筹码决定
-        //   - potOdds < 25% 且筹码充足 → 85% call, 15% raise
-        //   - potOdds 25-40% → 60% call, 5% raise, 35% fold
-        //   - potOdds > 40% → 20% call, 80% fold
-        // - 筹码 < 3BB → push or fold（短筹码策略）
+        const chips = player.chipCount;
+        const nick = player.nickname || player.id.substring(0, 8);
+        const r = Math.random();
         const { bb } = this.getCurrentBlinds();
-        
+
+        // Bot 随机打法（演示用，不看牌力）：
+        // - 无需跟注：55% 过牌，42% 随机下注（1BB~10BB），3% 全下
+        // - 面对下注：50% 跟注，27% 弃牌，20% 随机加注，3% 全下（筹码不足以加注时退化为跟/弃）
+        // 注意下注额必须 > currentBet，否则引擎拒收；筹码不足最小下注时只能过牌/全下
+        let action;
+        let amount = 0;
+        let label;
         if (toCall === 0) {
-          if (Math.random() < 0.2 && player.chipCount > bb * 5) {
-            // 偷池 raise
-            const raiseAmt = Math.min(player.chipCount, bb * 3);
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} raise ${raiseAmt} (steal)`);
-            this.handleAction(player.id, ACTIONS.RAISE, raiseAmt);
+          const minBet = Math.max(bb, hand.currentBet + 1);
+          if (r < 0.55 || chips < minBet) {
+            action = ACTIONS.CHECK;
+            label = 'check';
+          } else if (r < 0.97) {
+            const lo = minBet;
+            const hi = Math.min(chips, Math.max(lo, bb * 10));
+            amount = lo + Math.floor(Math.random() * (hi - lo + 1));
+            action = ACTIONS.RAISE;
+            label = `bet ${amount} (random)`;
           } else {
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} check`);
-            this.handleAction(player.id, ACTIONS.CHECK);
-          }
-        } else if (player.chipCount < bb * 3) {
-          // 短筹码 push or fold
-          if (Math.random() < 0.5) {
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} all-in (short stack)`);
-            this.handleAction(player.id, ACTIONS.ALLIN);
-          } else {
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} fold (short stack)`);
-            this.handleAction(player.id, ACTIONS.FOLD);
-          }
-        } else if (potOdds < 0.25) {
-          if (Math.random() < 0.15) {
-            const raiseAmt = Math.min(player.chipCount, hand.currentBet * 2 + bb);
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} raise ${raiseAmt}`);
-            this.handleAction(player.id, ACTIONS.RAISE, raiseAmt);
-          } else {
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} call ${toCall}`);
-            this.handleAction(player.id, ACTIONS.CALL, toCall);
-          }
-        } else if (potOdds < 0.4) {
-          const r = Math.random();
-          if (r < 0.05) {
-            const raiseAmt = Math.min(player.chipCount, hand.currentBet * 2 + bb);
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} raise ${raiseAmt}`);
-            this.handleAction(player.id, ACTIONS.RAISE, raiseAmt);
-          } else if (r < 0.65) {
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} call ${toCall}`);
-            this.handleAction(player.id, ACTIONS.CALL, toCall);
-          } else {
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} fold`);
-            this.handleAction(player.id, ACTIONS.FOLD);
+            action = ACTIONS.ALLIN;
+            label = 'all-in (random)';
           }
         } else {
-          if (Math.random() < 0.2) {
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} call ${toCall} (expensive)`);
-            this.handleAction(player.id, ACTIONS.CALL, toCall);
+          const canRaise = chips > hand.currentBet;
+          if (r < 0.50) {
+            action = ACTIONS.CALL;
+            amount = toCall;
+            label = `call ${toCall}`;
+          } else if (r < 0.77 || !canRaise) {
+            action = ACTIONS.FOLD;
+            label = 'fold';
+          } else if (r < 0.97) {
+            const lo = hand.currentBet + 1;
+            const hi = Math.min(chips, Math.max(lo, hand.currentBet + bb * 10));
+            amount = lo + Math.floor(Math.random() * (hi - lo + 1));
+            action = ACTIONS.RAISE;
+            label = `raise ${amount} (random)`;
           } else {
-            console.log(`[SNG] Bot ${player.nickname || player.id.substring(0,8)} fold (expensive)`);
-            this.handleAction(player.id, ACTIONS.FOLD);
+            action = ACTIONS.ALLIN;
+            label = 'all-in (random)';
           }
         }
+
+        console.log(`[SNG] Bot ${nick} ${label}`);
+        // 兜底：任何被拒的 bot 行动依次退化为 check → call → fold，保证牌局永不卡死
+        let res = this.handleAction(player.id, action, amount);
+        if (res && res.error) {
+          console.log(`[SNG] Bot ${nick} ${label} rejected: ${res.error}, fallback`);
+          res = this.handleAction(player.id, ACTIONS.CHECK);
+        }
+        if (res && res.error) res = this.handleAction(player.id, ACTIONS.CALL);
+        if (res && res.error) res = this.handleAction(player.id, ACTIONS.FOLD);
+        if (res && res.error) console.error(`[SNG] Bot ${nick} all fallbacks failed: ${res.error}`);
       } else {
         // Real player timeout: auto-fold
         console.log(`[SNG] Player ${player.id} timed out, auto-fold`);
         this.handleAction(player.id, ACTIONS.FOLD);
       }
-    }, this.actionTimeout);
+    }, delay);
 
     this.emit('action_timer_started', {
       seatIndex,
       playerId: player.id,
-      timeoutMs: this.actionTimeout,
+      timeoutMs: delay,
     });
   }
 
@@ -715,6 +723,7 @@ class SNGManager {
     for (const p of this.players) {
       if (p.chipCount === 0 && p.status !== PLAYER_STATUS.ELIMINATED) {
         p.status = PLAYER_STATUS.ELIMINATED;
+        if (!this.eliminationOrder.includes(p.id)) this.eliminationOrder.push(p.id);
         console.log(`[SNG] ${p.nickname || p.id.substring(0,8)} eliminated`);
         this.emit('player_eliminated', { playerId: p.id, handNumber: hand.handNumber });
       }
@@ -765,14 +774,22 @@ class SNGManager {
     this.tournament.status = TOURNAMENT_STATUS.FINISHED;
     this.tournament.finished_at = new Date();
 
-    // 排名：存活者按筹码降序排列，淘汰者按淘汰顺序倒排
+    // 排名：存活者按筹码降序排列，淘汰者按淘汰时间倒排（最后被淘汰者名次最高）。
+    // eliminationOrder 之外的淘汰者（如 poker-socket 断线直接置 eliminated）视为最早淘汰，
+    // 排在有记录者之后（名次更低），相互之间按座位序兜底。
     const eliminated = this.players.filter(p => p.status === PLAYER_STATUS.ELIMINATED);
     const survivors = this.players.filter(p => p.status !== PLAYER_STATUS.ELIMINATED)
       .sort((a, b) => b.chipCount - a.chipCount);
 
+    const recorded = this.eliminationOrder
+      .map(id => eliminated.find(p => p.id === id))
+      .filter(Boolean);
+    const unrecorded = eliminated.filter(p => !this.eliminationOrder.includes(p.id));
+    const eliminatedByRank = [...recorded.reverse(), ...unrecorded]; // 名次从高到低
+
     const rankings = [
       ...survivors.map((p, i) => ({ playerId: p.id, rank: i + 1, chips: p.chipCount, nickname: p.nickname })),
-      ...eliminated.reverse().map((p, i) => ({ playerId: p.id, rank: survivors.length + i + 1, chips: 0, nickname: p.nickname })),
+      ...eliminatedByRank.map((p, i) => ({ playerId: p.id, rank: survivors.length + i + 1, chips: 0, nickname: p.nickname })),
     ];
 
     console.log(`[SNG] Tournament ${this.tournament.id} finished. Rankings:`);
