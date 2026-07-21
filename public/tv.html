@@ -7,32 +7,72 @@
 <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; height:100vh; overflow:hidden; }
-.container { display:flex; flex-direction:column; height:100vh; }
-.top-bar { display:flex; justify-content:space-around; padding:12px 20px; background:#0D5C32; font-size:18px; }
+/* 面向投影/电视大屏：所有尺寸随视口高度缩放（1080p 基准，4K 同比放大），小窗有 clamp 下限与紧凑模式 */
+body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; height:100vh; height:100dvh; overflow:hidden; }
+.container { display:flex; flex-direction:column; height:100vh; height:100dvh; }
+.top-bar { display:flex; justify-content:space-around; padding:1.2vh 2vw; background:#0D5C32; font-size:clamp(15px,2.2vh,30px); }
 .top-bar span { color:#FFD700; font-weight:bold; }
-.table-area { flex:1; display:flex; align-items:center; justify-content:center; position:relative; }
-.seats-top, .seats-bottom { display:flex; gap:40px; justify-content:center; }
-.seat { background:#2a2a4a; border-radius:12px; padding:12px 20px; min-width:120px; text-align:center; border:2px solid #333; }
+.table-area { flex:1; display:flex; align-items:center; justify-content:center; position:relative; min-height:0; }
+.seats-top, .seats-bottom { display:flex; gap:clamp(16px,3vw,64px); justify-content:center; }
+.seat { background:#2a2a4a; border-radius:12px; padding:1.1vh 1.1vw; min-width:clamp(110px,11vw,230px); text-align:center; border:2px solid #333; }
 .seat.active { border-color:#E53935; animation:pulse 1s infinite; }
 .seat.folded { opacity:0.4; }
 .seat.allin { border-color:#FFD700; }
+.seat.eliminated { opacity:0.25; }
 .seat.empty { color:#666; }
-.seat .nick { font-size:14px; margin-bottom:4px; }
-.seat .chips { font-size:18px; color:#4CAF50; font-weight:bold; }
-.seat .status { font-size:12px; margin-top:4px; color:#aaa; }
-.community { display:flex; gap:8px; margin:20px 0; }
-.card { width:60px; height:84px; background:#F5F5F0; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:bold; }
+.seat .nick { font-size:clamp(12px,1.8vh,24px); margin-bottom:0.4vh; }
+.seat .d-badge { display:inline-block; background:#FFD700; color:#000; border-radius:50%; width:clamp(14px,1.9vh,24px); height:clamp(14px,1.9vh,24px); font-size:clamp(10px,1.2vh,15px); line-height:clamp(14px,1.9vh,24px); margin-left:4px; vertical-align:middle; }
+.seat .chips { font-size:clamp(15px,2.6vh,34px); color:#4CAF50; font-weight:bold; }
+.seat .bet { font-size:clamp(10px,1.5vh,19px); color:#FFD700; margin-top:0.2vh; }
+.seat .status { font-size:clamp(10px,1.5vh,19px); margin-top:0.4vh; color:#aaa; }
+.seat .reveal { display:flex; gap:0.4vw; justify-content:center; margin-top:0.6vh; }
+.mini-card { width:clamp(20px,2.8vh,34px); height:clamp(28px,3.9vh,48px); background:#F5F5F0; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:clamp(11px,1.7vh,20px); font-weight:bold; }
+.mini-card.red { color:#E53935; }
+.mini-card.black { color:#000; }
+.community { display:flex; gap:clamp(6px,1vh,14px); margin:1.8vh 0; justify-content:center; }
+.card { width:clamp(40px,7.6vh,92px); height:clamp(56px,10.6vh,130px); background:#F5F5F0; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:clamp(18px,3.4vh,42px); font-weight:bold; }
 .card.red { color:#E53935; }
 .card.black { color:#000; }
 .card.back { background:linear-gradient(135deg,#1a1a3e,#3a3a6e); color:#555; }
-.pot { text-align:center; font-size:24px; color:#FFD700; margin:10px 0; }
-.bottom-bar { display:flex; justify-content:center; gap:20px; padding:12px; background:#2a2a4a; }
-.bottom-bar button { background:#333; color:#fff; border:none; padding:8px 20px; border-radius:6px; cursor:pointer; font-size:14px; }
+.pot { text-align:center; font-size:clamp(18px,2.8vh,36px); color:#FFD700; margin:0.9vh 0; }
+.bottom-bar { display:flex; justify-content:center; gap:2vw; padding:1.1vh 1.5vw; background:#2a2a4a; }
+.bottom-bar button { background:#333; color:#fff; border:none; padding:0.8vh 1.5vw; border-radius:6px; cursor:pointer; font-size:clamp(12px,1.6vh,20px); }
+.bottom-bar .history { flex:1; min-width:0; text-align:left; align-self:center; }
+.bottom-bar .history .h-entry { color:#aaa; font-size:clamp(10px,1.4vh,17px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bottom-bar #statusText { font-size:clamp(11px,1.5vh,18px); }
 .connect-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
 .connect-screen input { font-size:24px; padding:12px; text-align:center; width:200px; background:#2a2a4a; color:#FFD700; border:2px solid #FFD700; border-radius:8px; letter-spacing:4px; }
 .connect-screen button { margin-top:20px; font-size:20px; padding:12px 40px; background:#4CAF50; color:#fff; border:none; border-radius:8px; cursor:pointer; }
 @keyframes pulse { 0%,100%{border-color:#E53935;} 50%{border-color:#FF6666;} }
+/* 赢家横幅（细节对齐 tv-display WinnerBanner，样式保持本页） */
+.winner-banner { position:fixed; top:5.2vh; left:50%; transform:translateX(-50%); z-index:50; background:#2a2a4a; border:2px solid #FFD700; border-radius:8px; padding:1.1vh 2.5vw; color:#FFD700; font-size:clamp(16px,2.8vh,34px); font-weight:bold; white-space:nowrap; animation:bannerDrop .3s ease-out; }
+@keyframes bannerDrop { from { transform:translate(-50%,-100%); opacity:0; } to { transform:translate(-50%,0); opacity:1; } }
+/* 实时排行（细节对齐 tv-display LeaderboardPanel，样式保持本页） */
+.leaderboard { position:absolute; right:1vw; top:50%; transform:translateY(-50%); background:#2a2a4a; border:2px solid #333; border-radius:8px; padding:1.2vh 1vw; min-width:clamp(140px,13vw,280px); z-index:5; }
+.leaderboard h4 { color:#FFD700; font-size:clamp(12px,2vh,24px); margin-bottom:0.6vh; text-align:center; }
+.lb-row { display:flex; justify-content:space-between; gap:1vw; font-size:clamp(10px,1.6vh,20px); padding:0.4vh 0; }
+.lb-row.leader { color:#FFD700; font-weight:bold; }
+.lb-row.out { color:#666; }
+/* 赛事结束排名浮层 */
+.finished-mask { position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:60; }
+.finished-box { background:#2a2a4a; border:2px solid #FFD700; border-radius:12px; padding:3vh 3vw; min-width:clamp(300px,26vw,560px); }
+.finished-box h2 { color:#FFD700; text-align:center; margin-bottom:1.2vh; font-size:clamp(20px,3.4vh,40px); }
+.fr-row { display:flex; justify-content:space-between; gap:2vw; padding:0.5vh 0; font-size:clamp(14px,2.2vh,28px); }
+.fr-row.first { color:#FFD700; font-weight:bold; }
+.finished-hint { color:#666; font-size:clamp(10px,1.4vh,16px); text-align:center; margin-top:1.2vh; }
+@media (max-width:900px) and (orientation:portrait) { .leaderboard { display:none; } }
+/* 矮视口（手机横屏）紧凑化，风格不变 */
+@media (max-height:500px) {
+  .top-bar { padding:8px 20px; font-size:15px; }
+  .community { margin:8px 0; }
+  .card { width:44px; height:62px; font-size:20px; }
+  .seat { padding:8px 14px; min-width:100px; }
+  .seat .nick { font-size:12px; }
+  .seat .chips { font-size:15px; }
+  .pot { font-size:18px; margin:6px 0; }
+  .bottom-bar { padding:8px 12px; }
+  .mini-card { width:22px; height:30px; font-size:11px; }
+}
 </style>
 </head>
 <body>
@@ -42,6 +82,45 @@ body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; heig
 const SERVER = window.location.origin;
 let socket = null;
 let tableCode = '';
+
+// ============ 牌桌状态（交互细节对齐 tv-display App / tv1.html，UI 保持本页风格） ============
+const S = {
+  seats: [], communityCards: [], pot: 0, currentBet: 0,
+  actingIndex: -1, dealerIndex: 0, handNumber: 0, stage: '',
+  blindLevel: 1, sb: 10, bb: 20, countdown: 0, phase: '',
+  statusText: '等待连接...', handHistory: [],
+  winnerBanner: null,      // {winnerName, winAmount, handName}
+  showdownHands: {},       // seatIndex → [card, card]
+  rankings: [], finished: false,
+};
+let finishedTimer = null;
+
+// ============ 工具（与 App 同规则） ============
+function fmt(n) { n = Math.floor(n || 0); if (n >= 1e6) return Math.floor(n/1e6)+'M'; if (n >= 1e3) return Math.floor(n/1e3)+'K'; return String(n); }
+function fmtAmt(n) { n = Math.floor(n || 0); if (n >= 1e6) return Math.floor(n/1e6)+'M'; if (n >= 1e4) return Math.floor(n/1e3)+'K'; return String(n); } // 横幅金额与 App formatAmount 一致
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function stageLabel(stage) {
+  return { preflop:'翻牌前', flop:'翻牌', turn:'转牌', river:'河牌', showdown:'摊牌' }[String(stage || '').toLowerCase()] || String(stage || '');
+}
+function buildActionText(action, amount) {
+  switch (String(action).toLowerCase()) {
+    case 'fold': return '弃牌';
+    case 'check': return '过牌';
+    case 'call': return amount > 0 ? `跟注 ${amount}` : '跟注';
+    case 'raise': return `加注到 ${amount}`;
+    case 'bet': return `下注 ${amount}`;
+    case 'allin': case 'all-in': case 'all_in': return `全下 ${amount}`;
+    case 'small_blind': return `小盲 ${amount}`;
+    case 'big_blind': return `大盲 ${amount}`;
+    default: return `${action} ${amount}`.trim();
+  }
+}
+function isAllin(st) { st = String(st || '').toLowerCase(); return st === 'allin' || st === 'all-in' || st === 'all_in'; }
+function addHistory(text, playerId) {
+  const seat = S.seats.find(s => s.playerId === playerId);
+  const name = seat && seat.nickname ? seat.nickname : '';
+  S.handHistory = [...S.handHistory, name ? `${name}: ${text}` : text].slice(-20);
+}
 
 function renderConnect() {
   document.getElementById('app').innerHTML = `
@@ -67,7 +146,8 @@ function connect() {
   socket = io(SERVER, { path: '/socket.io/', query: { role: 'tv' } });
   socket.on('connect', () => {
     socket.emit('join_table', tableCode);
-    renderTable();
+    if (!document.getElementById('seatsTop')) renderTable();
+    renderAll();
   });
   socket.on('connect_error', (err) => {
     // 连接失败要看得见，不能静默
@@ -78,28 +158,174 @@ function connect() {
     document.getElementById('app').innerHTML = '<div class="connect-screen"><h1 style="color:#E53935;">已断线，重连中...</h1></div>';
   });
 
-  // 事件处理
+  // ============ 事件处理（对齐 tv-display TableViewModel.handleEvent） ============
   socket.on('table_state', (d) => {
-    // 入座/重连后的全量状态：渲染座位、盲注、底池
-    if (d.seats) renderSeats(d.seats);
-    if (d.sb != null) updateBlinds({ sb: d.sb, bb: d.bb, level: d.blindLevel || 1 });
-    if (d.pot != null) updatePot(d.pot);
-    if (d.phase) updateStatus(d.phase === 'started' ? '比赛进行中' : d.phase === 'registering' ? '报名中，等待开赛...' : '等待赛事开始', d);
+    // 入座/重连后的全量状态
+    if (d.seats) S.seats = d.seats;
+    if (d.sb != null) { S.sb = d.sb; S.bb = d.bb; S.blindLevel = d.blindLevel || 1; }
+    if (d.pot != null) S.pot = d.pot;
+    if (d.currentBet != null) S.currentBet = d.currentBet;
+    if (d.communityCards) S.communityCards = d.communityCards;
+    S.actingIndex = d.actingIndex ?? -1;
+    S.dealerIndex = d.dealerIndex ?? 0;
+    if (d.handNumber != null) S.handNumber = d.handNumber;
+    if (d.stage != null) S.stage = d.stage;
+    if (d.countdown != null) S.countdown = d.countdown;
+    if (d.phase) {
+      S.phase = String(d.phase).toLowerCase();
+      S.statusText = S.phase === 'started' ? '比赛进行中' : S.phase === 'registering' ? '报名中，等待开赛...' : '等待赛事开始';
+    }
+    renderAll();
   });
-  socket.on('seat_joined', (d) => { if (d.seats) renderSeats(d.seats); });
-  socket.on('tournament_activated', (d) => updateStatus('等待玩家入座...', d));
-  socket.on('countdown_tick', (d) => updateCountdown(d.remaining));
-  socket.on('tournament_started', (d) => { updateStatus('比赛开始!', d); if (d.seats) renderSeats(d.seats); });
-  socket.on('new_hand', (d) => updateStatus(`第 ${d.handNumber} 手`, d));
-  socket.on('hand_started', (d) => { updateStatus(`第 ${d.handNumber} 手 - ${d.stage}`, d); updatePot(d.pot); if (d.seats) renderSeats(d.seats); });
-  socket.on('stage_changed', (d) => { updateStage(d); if (d.seats) renderSeats(d.seats); });
-  socket.on('turn_changed', (d) => { updateActing(d.actingIndex); if (d.seats) renderSeats(d.seats); });
-  socket.on('action_result', (d) => { updateAction(d); updatePot(d.pot); if (d.seats) renderSeats(d.seats); });
-  socket.on('showdown', (d) => { updateShowdown(d); });
-  socket.on('hand_result', (d) => { updateStatus(`第 ${d.handNumber} 手结束 - 赢家获得 ${d.pot}`, d); if (d.seats) renderSeats(d.seats); });
-  socket.on('player_eliminated', (d) => { if (d.seats) renderSeats(d.seats); });
-  socket.on('blind_level_up', (d) => { updateBlinds(d); });
-  socket.on('tournament_finished', (d) => { updateStatus('比赛结束', d); if (d.seats) renderSeats(d.seats); });
+  socket.on('seat_joined', (d) => {
+    // 服务端只发单座字段（seatIndex/nickname/...），不是整桌
+    if (d.seatIndex == null || d.seatIndex < 0) return;
+    const seat = {
+      seatIndex: d.seatIndex, playerId: d.playerId || '', nickname: d.nickname || '',
+      avatar: d.avatar || '', status: 'waiting', chipCount: d.chipCount ?? 1000,
+      currentBet: 0, lastAction: '',
+    };
+    const i = S.seats.findIndex(s => s.seatIndex === d.seatIndex);
+    if (i >= 0) S.seats[i] = seat; else S.seats.push(seat);
+    renderAll();
+  });
+  socket.on('seat_left', (d) => {
+    if (d.seatIndex == null || d.seatIndex < 0) return;
+    S.seats = S.seats.map(s => s.seatIndex === d.seatIndex ? { seatIndex: d.seatIndex, status: 'empty' } : s);
+    renderAll();
+  });
+  socket.on('tournament_activated', (d) => { S.phase = 'registering'; S.statusText = '等待玩家入座...'; renderAll(); });
+  socket.on('countdown_tick', (d) => { S.countdown = d.remaining ?? 0; renderAll(); });
+  socket.on('tournament_started', (d) => {
+    if (d.seats) S.seats = d.seats;
+    S.phase = 'started'; S.countdown = 0; S.statusText = '比赛开始!';
+    renderAll();
+  });
+  socket.on('new_hand', (d) => {
+    // 保留公共牌到 hand_started 才清除
+    S.stage = 'preflop'; S.actingIndex = -1;
+    if (d.handNumber != null) S.handNumber = d.handNumber;
+    if (d.dealerIndex != null) S.dealerIndex = d.dealerIndex;
+    S.statusText = `第 ${S.handNumber} 手`;
+    renderAll();
+  });
+  socket.on('hand_started', (d) => {
+    S.handNumber = d.handNumber ?? S.handNumber;
+    S.stage = d.stage || 'preflop';
+    S.pot = d.pot ?? 0;
+    S.currentBet = d.currentBet ?? 0;
+    S.actingIndex = d.actingIndex ?? -1;
+    if (d.seats) S.seats = d.seats;
+    if (d.dealerIndex != null) S.dealerIndex = d.dealerIndex;
+    S.communityCards = [];   // 新一手清公共牌
+    S.winnerBanner = null;   // 清上一手赢家横幅
+    S.showdownHands = {};    // 清上一手摊牌明牌
+    S.statusText = `第 ${S.handNumber} 手 - ${stageLabel(S.stage)}`;
+    renderAll();
+  });
+  socket.on('stage_changed', (d) => {
+    S.stage = d.stage || S.stage;
+    if (d.communityCards) S.communityCards = d.communityCards;
+    S.pot = d.pot ?? S.pot;
+    S.currentBet = d.currentBet ?? 0;
+    S.actingIndex = d.actingIndex ?? -1;
+    if (d.seats && d.seats.length) S.seats = d.seats;
+    S.statusText = stageLabel(S.stage);
+    renderAll();
+  });
+  socket.on('turn_changed', (d) => {
+    S.actingIndex = d.actingIndex ?? -1;
+    S.pot = d.pot ?? S.pot;
+    S.currentBet = d.currentBet ?? S.currentBet;
+    if (d.seats && d.seats.length) S.seats = d.seats;
+    renderAll();
+  });
+  socket.on('action_result', (d) => {
+    const actionText = buildActionText(d.action, d.amount);
+    if (d.seats && d.seats.length) {
+      S.seats = d.seats.map(seat => ({
+        ...seat,
+        lastAction: seat.playerId === d.playerId ? actionText : (seat.lastAction || ''),
+      }));
+    } else {
+      // 服务端没带座位时的本地兜底（与 App 同规则）
+      S.seats = S.seats.map(seat => {
+        if (seat.playerId !== d.playerId) return seat;
+        const a = String(d.action).toLowerCase();
+        let chips = seat.chipCount || 0;
+        if (a === 'call' || a === 'raise' || a === 'bet') chips -= (d.amount || 0);
+        if (isAllin(a)) chips = 0;
+        return {
+          ...seat,
+          lastAction: actionText,
+          status: a === 'fold' ? 'folded' : (isAllin(a) ? 'allin' : seat.status),
+          chipCount: Math.max(0, chips),
+          currentBet: ['raise', 'bet', 'call'].includes(a) ? d.amount : seat.currentBet,
+        };
+      });
+    }
+    S.pot = d.pot ?? S.pot;
+    S.currentBet = d.currentBet ?? S.currentBet;
+    S.actingIndex = d.actingIndex ?? -1;
+    addHistory(actionText, d.playerId);
+    renderAll();
+  });
+  socket.on('showdown', (d) => {
+    S.stage = 'showdown';
+    S.pot = d.pot ?? S.pot;
+    if (d.communityCards && d.communityCards.length) S.communityCards = d.communityCards;
+    if (d.allResults) {
+      const map = {};
+      d.allResults.forEach(r => {
+        if (r.seatIndex >= 0 && r.holeCards && r.holeCards.length) map[r.seatIndex] = r.holeCards;
+      });
+      if (Object.keys(map).length) S.showdownHands = map;
+    }
+    S.statusText = '摊牌';
+    renderAll();
+  });
+  socket.on('hand_result', (d) => {
+    if (d.seats && d.seats.length) {
+      S.seats = d.seats;
+    } else if (d.winnerId) {
+      S.seats = S.seats.map(s => s.playerId === d.winnerId ? { ...s, chipCount: (s.chipCount || 0) + (d.pot || 0) } : s);
+    }
+    const winner = S.seats.find(s => s.playerId === d.winnerId);
+    const winnerName = (winner && winner.nickname) || d.winnerId || '';
+    S.pot = 0; S.currentBet = 0; S.actingIndex = -1;
+    S.winnerBanner = winnerName ? { winnerName, winAmount: d.winAmount ?? d.pot ?? 0, handName: d.handName || '' } : null;
+    S.statusText = `第 ${d.handNumber} 手结束 - ${winnerName} 赢得 ${d.pot}`;
+    addHistory(`第${d.handNumber}手：${winnerName} 赢得底池 ${d.pot}`);
+    renderAll();
+  });
+  socket.on('player_eliminated', (d) => {
+    S.seats = S.seats.map(s => s.playerId === d.playerId ? { ...s, status: 'eliminated' } : s);
+    renderAll();
+  });
+  socket.on('blind_level_up', (d) => {
+    S.blindLevel = d.level ?? S.blindLevel;
+    S.sb = d.sb ?? S.sb;
+    S.bb = d.bb ?? S.bb;
+    renderAll();
+  });
+  socket.on('tournament_finished', (d) => {
+    S.rankings = d.rankings || [];
+    if (d.seats) S.seats = d.seats;
+    S.finished = true;
+    S.statusText = '比赛结束';
+    renderAll();
+    // 5 秒后自动回等待状态（对齐 tv1.html / App FinishedScreen）
+    if (finishedTimer) clearTimeout(finishedTimer);
+    finishedTimer = setTimeout(() => {
+      finishedTimer = null;
+      Object.assign(S, {
+        finished: false, rankings: [], seats: [], pot: 0, communityCards: [],
+        stage: '', handNumber: 0, countdown: 0, winnerBanner: null, showdownHands: {},
+        statusText: '等待赛事开始',
+      });
+      renderAll();
+    }, 5000);
+  });
 }
 
 function renderTable() {
@@ -109,6 +335,7 @@ function renderTable() {
         <span>桌号: <span id="code">${tableCode}</span></span>
         <span>盲注: <span id="blinds">10/20</span></span>
         <span>级别: <span id="level">1</span></span>
+        <span>手牌: <span id="handNo">--</span></span>
         <span>奖池: <span id="pot">0</span></span>
         <span>倒计时: <span id="countdown">--</span></span>
       </div>
@@ -119,98 +346,173 @@ function renderTable() {
           <div class="pot" id="potDisplay">底池: 0</div>
           <div class="seats-bottom" id="seatsBottom"></div>
         </div>
+        <div class="leaderboard" id="leaderboard"></div>
       </div>
       <div class="bottom-bar">
-        <button onclick="location.reload()">断开</button>
+        <div class="history" id="history"></div>
         <span id="statusText" style="color:#aaa;align-self:center;">等待连接...</span>
+        <button onclick="location.reload()">断开</button>
       </div>
     </div>
   `;
-  renderSeats();
 }
 
-function renderSeats(players = []) {
+// ============ 分块渲染（全部由状态 S 驱动） ============
+// 部分浏览器（老 Chrome）不认 100dvh，100vh 会被地址栏顶高，用 JS 实测视口高度兜底
+function fitViewport() {
+  const c = document.querySelector('.container');
+  if (c) c.style.height = window.innerHeight + 'px';
+}
+window.addEventListener('resize', fitViewport);
+
+function renderAll() {
+  if (!document.getElementById('seatsTop')) return;
+  fitViewport();
+  renderTopBar();
+  renderSeats();
+  renderCommunity();
+  renderBottom();
+  renderBanner();
+  renderLeaderboard();
+  renderFinished();
+}
+
+function renderTopBar() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('blinds', `${S.sb}/${S.bb}`);
+  set('level', S.blindLevel);
+  set('handNo', S.handNumber > 0 ? `#${S.handNumber}` : '--');
+  set('pot', S.pot);
+  if (S.countdown > 0) {
+    const m = Math.floor(S.countdown / 60);
+    const s = S.countdown % 60;
+    set('countdown', `${m}:${String(s).padStart(2, '0')}`);
+  } else {
+    set('countdown', '--');
+  }
+}
+
+function renderSeats() {
   const seatsTop = document.getElementById('seatsTop');
   const seatsBottom = document.getElementById('seatsBottom');
   if (!seatsTop) return;
-  
+
   const seats = [];
   for (let i = 0; i < 6; i++) {
-    const p = players.find(x => x.seatIndex === i);
+    const p = S.seats.find(x => x.seatIndex === i);
     seats.push(p || { seatIndex: i, nickname: '空座', chipCount: 0, status: 'empty' });
   }
-  
-  seatsTop.innerHTML = seats.slice(0, 3).map(s => seatHTML(s)).join('');
-  seatsBottom.innerHTML = seats.slice(3, 6).reverse().map(s => seatHTML(s)).join('');
+
+  seatsTop.innerHTML = seats.slice(0, 3).map(s => seatHTML(s, true)).join('');
+  seatsBottom.innerHTML = seats.slice(3, 6).reverse().map(s => seatHTML(s, false)).join('');
 }
 
-function seatHTML(s) {
+function seatHTML(s, topRow) {
+  const st = String(s.status || '').toLowerCase();
   let cls = 'seat';
-  if (s.status === 'folded') cls += ' folded';
-  if (s.status === 'allin' || s.status === 'allIn') cls += ' allin';
-  if (s.status === 'empty') cls += ' empty';
-  const statusText = {waiting:'等待',playing:'坐席中',folded:'弃牌',allin:'All-In',allIn:'All-In',eliminated:'淘汰',empty:'空座'}[s.status] || s.status;
+  if (st === 'folded') cls += ' folded';
+  if (isAllin(st)) cls += ' allin';
+  if (st === 'eliminated') cls += ' eliminated';
+  if (st === 'empty') cls += ' empty';
+  if (s.seatIndex === S.actingIndex && st !== 'empty') cls += ' active';
+  const statusText = s.lastAction
+    || { waiting:'等待', playing:'坐席中', folded:'弃牌', allin:'All-In', eliminated:'淘汰', empty:'空座' }[st]
+    || st;
+  // 摊牌明牌：翻向桌心（上排朝下/下排朝上），与 App SeatWithReveal 一致
+  const reveal = S.showdownHands[s.seatIndex];
+  const revealHTML = (reveal && reveal.length)
+    ? `<div class="reveal">${reveal.slice(0, 2).map(c => {
+        const red = c.suit === '♥' || c.suit === '♦';
+        return `<div class="mini-card ${red ? 'red' : 'black'}">${esc(c.rank)}${esc(c.suit)}</div>`;
+      }).join('')}</div>`
+    : '';
   return `<div class="${cls}" id="seat-${s.seatIndex}">
-    <div class="nick">${s.nickname || '空座'}</div>
+    ${!topRow ? revealHTML : ''}
+    <div class="nick">${esc(s.nickname || '空座')}${s.seatIndex === S.dealerIndex && st !== 'empty' ? '<span class="d-badge">D</span>' : ''}</div>
     <div class="chips">${s.chipCount || 0}</div>
-    <div class="status">${statusText}</div>
+    ${s.currentBet > 0 ? `<div class="bet">下注 ${s.currentBet}</div>` : ''}
+    <div class="status">${esc(statusText)}</div>
+    ${topRow ? revealHTML : ''}
   </div>`;
 }
 
-function updateStatus(text, data) {
-  const el = document.getElementById('statusText');
-  if (el) el.textContent = text;
-}
-function updateCountdown(sec) {
-  const el = document.getElementById('countdown');
-  if (el) {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    el.textContent = `${m}:${s.toString().padStart(2,'0')}`;
-  }
-}
-function updatePot(pot) {
-  const el = document.getElementById('potDisplay');
-  if (el) el.textContent = `底池: ${pot}`;
-  const el2 = document.getElementById('pot');
-  if (el2) el2.textContent = pot;
-}
-function updateBlinds(d) {
-  const el = document.getElementById('blinds');
-  if (el) el.textContent = `${d.sb}/${d.bb}`;
-  const el2 = document.getElementById('level');
-  if (el2) el2.textContent = d.level;
-}
-function updateStage(d) {
-  const stageNames = { preflop:'翻牌前', flop:'翻牌', turn:'转牌', river:'河牌', showdown:'摊牌' };
-  updateStatus(stageNames[d.stage] || d.stage, d);
-  updatePot(d.pot);
-  if (d.communityCards) {
-    const el = document.getElementById('community');
-    if (el) {
-      el.innerHTML = d.communityCards.map(c => {
-        const red = c.suit === '♥' || c.suit === '♦';
-        return `<div class="card ${red?'red':'black'}">${c.rank}${c.suit}</div>`;
-      }).join('');
+function renderCommunity() {
+  const el = document.getElementById('community');
+  if (!el) return;
+  // 固定 5 个卡位，未发的显示卡背（与 App 一致）
+  let html = '';
+  for (let i = 0; i < 5; i++) {
+    const c = S.communityCards[i];
+    if (c) {
+      const red = c.suit === '♥' || c.suit === '♦';
+      html += `<div class="card ${red ? 'red' : 'black'}">${esc(c.rank)}${esc(c.suit)}</div>`;
+    } else {
+      html += '<div class="card back"></div>';
     }
   }
+  el.innerHTML = html;
+  const potEl = document.getElementById('potDisplay');
+  if (potEl) potEl.textContent = `底池: ${S.pot}`;
 }
-function updateActing(idx) {
-  document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
-  if (idx >= 0) {
-    const el = document.getElementById(`seat-${idx}`);
-    if (el) el.classList.add('active');
+
+function renderBottom() {
+  const st = document.getElementById('statusText');
+  if (st) st.textContent = S.statusText;
+  const h = document.getElementById('history');
+  if (h) h.innerHTML = S.handHistory.slice(-2).reverse().map(x => `<div class="h-entry">${esc(x)}</div>`).join('');
+}
+
+function renderBanner() {
+  let el = document.getElementById('winnerBanner');
+  if (!S.winnerBanner) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'winnerBanner';
+    el.className = 'winner-banner';
+    document.body.appendChild(el);
   }
+  const b = S.winnerBanner;
+  el.textContent = `🎉 ${b.winnerName} 赢得 ${fmtAmt(b.winAmount)}${b.handName ? ' · ' + b.handName : ''}`;
 }
-function updateAction(d) {
-  const el = document.getElementById(`seat-${d.seatIndex || 0}`);
-  // Could show action text
+
+// 实时排行：与 tv-display LeaderboardPanel 排序/字段保持一致（改动需两边同步）
+function renderLeaderboard() {
+  const el = document.getElementById('leaderboard');
+  if (!el) return;
+  const ranked = S.seats
+    .filter(p => p.status !== 'empty')
+    .sort((a, b) => {
+      const ae = a.status === 'eliminated' ? 1 : 0;
+      const be = b.status === 'eliminated' ? 1 : 0;
+      if (ae !== be) return ae - be;
+      if ((b.chipCount || 0) !== (a.chipCount || 0)) return (b.chipCount || 0) - (a.chipCount || 0);
+      return a.seatIndex - b.seatIndex;
+    });
+  if (!ranked.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<h4>实时排行</h4>' + ranked.map((p, i) => {
+    const out = p.status === 'eliminated';
+    const leader = i === 0 && !out;
+    return `<div class="lb-row ${out ? 'out' : ''} ${leader ? 'leader' : ''}">
+      <span>${leader ? '🥇 ' : ''}#${i + 1} ${esc(p.nickname || '')}</span>
+      <span>${out ? '淘汰' : (p.chipCount ?? 0)}</span>
+    </div>`;
+  }).join('');
 }
-function updateShowdown(d) {
-  if (d.winners && d.winners.length > 0) {
-    const w = d.winners[0];
-    updateStatus(`🎉 ${w.playerId || '玩家'} 赢得 ${d.pot}! (${w.handName || ''})`, d);
-  }
+
+function renderFinished() {
+  let mask = document.getElementById('finishedMask');
+  if (!S.finished) { if (mask) mask.remove(); return; }
+  const medals = ['🥇', '🥈', '🥉'];
+  const rows = (S.rankings || []).map((r, i) => `
+    <div class="fr-row ${i === 0 ? 'first' : ''}">
+      <span>${medals[i] || (i + 1) + '.'} ${esc(r.nickname || 'Player ' + (i + 1))}</span>
+      <span>${fmt(Number(r.chips ?? r.finalChips ?? 0))}</span>
+    </div>`).join('');
+  const html = `<div class="finished-mask" id="finishedMask"><div class="finished-box">
+    <h2>🏆 比赛结束</h2>${rows}
+    <div class="finished-hint">5 秒后自动返回…</div>
+  </div></div>`;
+  if (mask) mask.outerHTML = html; else document.body.insertAdjacentHTML('beforeend', html);
 }
 
 // 启动
