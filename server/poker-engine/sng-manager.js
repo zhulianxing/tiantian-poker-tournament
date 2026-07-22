@@ -3,14 +3,16 @@
 
 const { createDeck, shuffle, deal } = require('./deck');
 const { evaluateBest, compareHands } = require('./hand-evaluator');
-const { SNG_DEFAULTS, TOURNAMENT_STATUS, PLAYER_STATUS, ACTIONS } = require('../shared/constants');
+const { decideBotAction } = require('./bot-ai');
+const { SNG_DEFAULTS, TOURNAMENT_STATUS, PLAYER_STATUS, ACTIONS, BOT_COMPANION } = require('../shared/constants');
 
 /**
  * SNG 赛事状态机
  *
  * 状态流转：
  * registering → started → finished
- *              ↘ cancelled (倒计时结束 < 2 人)
+ *              ↘ cancelled (倒计时结束仍无真人入座)
+ *              （≥1 真人即开赛，空位由陪玩 Bot 补足，见 poker-socket fillBotsToFull）
  *
  * 每手牌流程：
  * 1. 新一手开始 → 收盲注 → 发底牌 → 翻前下注 → 翻牌 → 转牌 → 河牌 → 摊牌
@@ -27,7 +29,7 @@ class SNGManager {
     this.dealerIndex = 0; // 庄家位置（座位号）
     this.actionTimer = null; // 操作超时定时器
     this.actionTimeout = (tournament.action_timeout || SNG_DEFAULTS.ACTION_TIMEOUT) * 1000;
-    this.botActionDelayMs = Number(process.env.BOT_ACTION_MS) || 3000; // Bot 行动间隔（演示节奏用）
+    this.botActionDelayMs = BOT_COMPANION.ACTION_MS; // 陪玩 Bot 行动节奏（默认 3 秒）
     this.eliminationOrder = []; // 淘汰时间顺序（playerId 先淘汰在前），用于最终排名
   }
 
@@ -458,54 +460,25 @@ class SNGManager {
         const hand = this.currentHand;
         if (!hand) return;
         const alreadyBet = this.getSeatCurrentBet(seatIndex);
-        const toCall = Math.max(0, hand.currentBet - alreadyBet);
         const chips = player.chipCount;
         const nick = player.nickname || player.id.substring(0, 8);
-        const r = Math.random();
         const { bb } = this.getCurrentBlinds();
 
-        // Bot 随机打法（演示用，不看牌力）：
-        // - 无需跟注：55% 过牌，42% 随机下注（1BB~10BB），3% 全下
-        // - 面对下注：50% 跟注，27% 弃牌，20% 随机加注，3% 全下（筹码不足以加注时退化为跟/弃）
-        // 注意下注额必须 > currentBet，否则引擎拒收；筹码不足最小下注时只能过牌/全下
-        let action;
-        let amount = 0;
-        let label;
-        if (toCall === 0) {
-          const minBet = Math.max(bb, hand.currentBet + 1);
-          if (r < 0.55 || chips < minBet) {
-            action = ACTIONS.CHECK;
-            label = 'check';
-          } else if (r < 0.97) {
-            const lo = minBet;
-            const hi = Math.min(chips, Math.max(lo, bb * 10));
-            amount = lo + Math.floor(Math.random() * (hi - lo + 1));
-            action = ACTIONS.RAISE;
-            label = `bet ${amount} (random)`;
-          } else {
-            action = ACTIONS.ALLIN;
-            label = 'all-in (random)';
-          }
-        } else {
-          const canRaise = chips > hand.currentBet;
-          if (r < 0.50) {
-            action = ACTIONS.CALL;
-            amount = toCall;
-            label = `call ${toCall}`;
-          } else if (r < 0.77 || !canRaise) {
-            action = ACTIONS.FOLD;
-            label = 'fold';
-          } else if (r < 0.97) {
-            const lo = hand.currentBet + 1;
-            const hi = Math.min(chips, Math.max(lo, hand.currentBet + bb * 10));
-            amount = lo + Math.floor(Math.random() * (hi - lo + 1));
-            action = ACTIONS.RAISE;
-            label = `raise ${amount} (random)`;
-          } else {
-            action = ACTIONS.ALLIN;
-            label = 'all-in (random)';
-          }
-        }
+        // 陪玩 Bot：蒙特卡洛实时胜率 + 底池赔率决策（见 bot-ai.js）
+        const decision = decideBotAction({
+          holeCards: hand.holeCards[player.id] || [],
+          revealed: hand.revealedCommunity,
+          stage: hand.stage,
+          pot: hand.pot,
+          currentBet: hand.currentBet,
+          alreadyBet,
+          chips,
+          bb,
+          numOpponents: this.getNonFoldedPlayers().length - 1,
+        });
+        const action = decision.action;
+        const amount = decision.amount;
+        const label = `${action}${amount ? ' ' + amount : ''} (equity ${(decision.equity * 100).toFixed(0)}%, ${decision.reason})`;
 
         console.log(`[SNG] Bot ${nick} ${label}`);
         // 兜底：任何被拒的 bot 行动依次退化为 check → call → fold，保证牌局永不卡死

@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const { SNGManager } = require('@poker-night/poker-engine');
 const { query } = require('@poker-night/shared');
-const { TOURNAMENT_STATUS, PLAYER_STATUS, ACTIONS, SNG_DEFAULTS } = require('@poker-night/shared');
+const { TOURNAMENT_STATUS, PLAYER_STATUS, ACTIONS, SNG_DEFAULTS, BOT_COMPANION } = require('@poker-night/shared');
 
 const app = express();
 app.use(express.json());
@@ -356,27 +356,78 @@ function startWaitCountdown(tournamentId, duration, tableCode) {
       clearInterval(timer);
       countdownTimers.delete(tournamentId);
 
-      // 检查入座人数
+      // 陪玩机制：按真人数决定——0 真人取消赛事（触发退款）；
+      // ≥1 真人即开赛，startTournament 内部会用陪玩 Bot 补足 max_players
       const result = await query(
-        'SELECT player_count, max_players FROM tournaments WHERE id = $1', [tournamentId]
+        `SELECT COUNT(*) AS humans FROM tournament_players tp
+         JOIN players p ON p.id = tp.player_id
+         WHERE tp.tournament_id = $1
+           AND p.nickname NOT LIKE 'Bot%' AND p.nickname NOT LIKE 'AutoBot%'`,
+        [tournamentId]
       );
-      const t = result.rows[0];
-      if (!t) return;
-
-      if (t.player_count < SNG_DEFAULTS.MIN_PLAYERS) {
-        // 取消赛事，触发退款
-        await cancelTournament(tournamentId, 'insufficient players');
-      } else if (t.player_count >= t.max_players) {
-        // 已满人，直接开赛
-        await startTournament(tournamentId);
+      const humans = Number(result.rows[0] ? result.rows[0].humans : 0);
+      if (humans === 0) {
+        await cancelTournament(tournamentId, 'no human players');
       } else {
-        // 倒计时结束，≥2 人开赛
         await startTournament(tournamentId);
       }
     }
   }, 1000);
 
   countdownTimers.set(tournamentId, timer);
+}
+
+// ============================================================
+// 永久测试房间：is_test 牌桌永远保持一场免费可入座的测试赛
+// （结束/取消后自动开下一场；服务启动自检补齐）
+// ============================================================
+async function ensureTestRoomTournament(tableCode) {
+  try {
+    const tb = await query('SELECT * FROM tables WHERE code = $1 AND is_test = true', [tableCode]);
+    const table = tb.rows[0];
+    if (!table) return;
+    // 清理僵死赛事：未支付 pending 超过 15 分钟的视为废弃（否则永远挡住测试房间）
+    const stale = await query(
+      `UPDATE tournaments SET status = 'cancelled'
+       WHERE table_id = $1 AND status = 'pending' AND created_at < NOW() - INTERVAL '15 minutes'
+       RETURNING id`,
+      [table.id]
+    );
+    if (stale.rows.length) {
+      await query(
+        `UPDATE orders SET status = 'cancelled' WHERE status = 'pending' AND tournament_id = ANY($1)`,
+        [stale.rows.map(r => r.id)]
+      );
+      console.log(`[Socket] Test room ${tableCode}: cleaned ${stale.rows.length} stale pending tournament(s)`);
+    }
+    // 已有 pending/registering/started 赛事则不动
+    const act = await query(
+      `SELECT id FROM tournaments WHERE table_id = $1 AND status IN ('pending','registering','started') LIMIT 1`,
+      [table.id]
+    );
+    if (act.rows.length) return;
+    const displayCode = 'T' + Math.random().toString(36).slice(2, 7).toUpperCase();
+    const ins = await query(
+      `INSERT INTO tournaments (display_code, table_id, launch_fee, max_players, start_chips,
+        start_blind, blind_interval, wait_countdown, action_timeout, status)
+       VALUES ($1, $2, 0, $3, 1000, 10, 300, $4, 30, 'pending') RETURNING id`,
+      [displayCode, table.id, table.max_players || 6, SNG_DEFAULTS.WAIT_COUNTDOWN]
+    );
+    const tid = ins.rows[0].id;
+    console.log(`[Socket] Test room ${tableCode}: new free tournament ${displayCode} (${tid})`);
+    await activateTournament(tid);
+  } catch (e) {
+    console.error(`[Socket] Test room ${tableCode} ensure error:`, e.message);
+  }
+}
+
+async function ensureAllTestRooms() {
+  try {
+    const r = await query('SELECT code FROM tables WHERE is_test = true', []);
+    for (const row of r.rows) await ensureTestRoomTournament(row.code);
+  } catch (e) {
+    console.error('[Socket] Test room startup check error:', e.message);
+  }
 }
 
 // ============================================================
@@ -389,6 +440,59 @@ async function cancelTournament(tournamentId, reason) {
   // 通知退款（由 payment-svc 处理）
   io.emit('tournament_cancelled', { tournamentId, reason });
   console.log(`[Socket] Tournament ${tournamentId} cancelled: ${reason}`);
+
+  // 永久测试房间：取消后自动开下一场
+  try {
+    const tr = await query(
+      'SELECT tbl.code FROM tournaments t JOIN tables tbl ON t.table_id = tbl.id WHERE t.id = $1',
+      [tournamentId]
+    );
+    if (tr.rows[0]) setTimeout(() => ensureTestRoomTournament(tr.rows[0].code), 5000);
+  } catch (e) { /* 测试房间重开失败不影响主流程 */ }
+}
+
+// ============================================================
+// 陪玩 Bot 补人：开赛前往空座位补 Bot，凑满 max_players
+// 仅在已有真人（已付费/已入座）时触发；纯 Bot 局不开
+// ============================================================
+async function fillBotsToFull(tournamentId, tournament) {
+  if (!BOT_COMPANION.ENABLED) return;
+  const maxPlayers = tournament.max_players || SNG_DEFAULTS.MAX_PLAYERS;
+  const pRes = await query(
+    `SELECT tp.seat_index, p.nickname FROM tournament_players tp
+     JOIN players p ON p.id = tp.player_id WHERE tp.tournament_id = $1`,
+    [tournamentId]
+  );
+  const humans = pRes.rows.filter(r => {
+    const n = r.nickname || '';
+    return !n.startsWith('Bot') && !n.startsWith('AutoBot');
+  });
+  if (humans.length === 0) return; // 无真人不补（倒计时分支会取消赛事）
+
+  const occupied = new Set(pRes.rows.map(r => r.seat_index));
+  const need = maxPlayers - pRes.rows.length;
+  if (need <= 0) return;
+
+  const startChips = tournament.start_chips || SNG_DEFAULTS.START_CHIPS;
+  let filled = 0;
+  for (let seat = 0; seat < maxPlayers && filled < need; seat++) {
+    if (occupied.has(seat)) continue;
+    const nick = 'Bot' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    const pIns = await query(
+      'INSERT INTO players (nickname, avatar) VALUES ($1, $2) RETURNING id',
+      [nick, '🤖']
+    );
+    await query(
+      `INSERT INTO tournament_players (tournament_id, player_id, seat_index, chip_count, status)
+       VALUES ($1, $2, $3, $4, 'registered')`,
+      [tournamentId, pIns.rows[0].id, seat, startChips]
+    );
+    filled++;
+  }
+  if (filled > 0) {
+    await query('UPDATE tournaments SET player_count = player_count + $1 WHERE id = $2', [filled, tournamentId]);
+    console.log(`[Socket] Companion bots filled: +${filled} bots for tournament ${tournamentId} (${humans.length} human)`);
+  }
 }
 
 // ============================================================
@@ -406,6 +510,9 @@ async function startTournament(tournamentId) {
     // 获取赛事和玩家
     const tResult = await query('SELECT * FROM tournaments WHERE id = $1', [tournamentId]);
     const tournament = tResult.rows[0];
+
+    // 陪玩补人：不足 max_players 时用 Bot 补满（需在读取玩家列表之前）
+    await fillBotsToFull(tournamentId, tournament);
 
     const pResult = await query(
       `SELECT tp.*, p.nickname FROM tournament_players tp
@@ -454,6 +561,8 @@ async function startTournament(tournamentId) {
             [TOURNAMENT_STATUS.FINISHED, tournamentId]);
           console.log(`[Socket] Tournament ${tournament.display_code} finished, results saved`);
           activeGames.delete(tournamentId);
+          // 永久测试房间：结束后 10 秒自动开下一场
+          setTimeout(() => ensureTestRoomTournament(tableCode), 10000);
         } catch (e) {
           console.error('[Socket] Failed to save tournament results:', e.message);
         }
@@ -509,4 +618,6 @@ setInterval(() => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Poker Socket] running on port ${PORT}`);
+  // 永久测试房间自检（等 DB 就绪）
+  setTimeout(ensureAllTestRooms, 3000);
 });

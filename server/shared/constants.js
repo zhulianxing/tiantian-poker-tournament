@@ -61,6 +61,15 @@ const SNG_DEFAULTS = {
   MAX_PLAYERS: 6,
 };
 
+// 陪玩 Bot 系统：
+// 等待倒计时到期时若真人不足 max_players，自动用 Bot 补足开赛（0 真人仍取消）。
+// Bot 决策基于蒙特卡洛实时胜率（poker-engine/bot-ai.js），3 秒内行动。
+const BOT_COMPANION = {
+  ENABLED: process.env.BOT_FILL_ENABLED !== '0',          // BOT_FILL_ENABLED=0 关闭补人
+  ACTION_MS: Number(process.env.BOT_ACTION_MS) || 3000,   // Bot 行动节奏
+  MC_SCALE: Number(process.env.BOT_MC_SCALE) || 1,        // 蒙特卡洛迭代数倍率（调精度/性能）
+};
+
 // 盲注升级表
 function getBlindLevel(level) {
   const sb = SNG_DEFAULTS.START_BLIND_SB * Math.pow(2, level - 1);
@@ -76,5 +85,6 @@ module.exports = {
   ACTIONS,
   FEE_SPLIT,
   SNG_DEFAULTS,
+  BOT_COMPANION,
   getBlindLevel,
 };
