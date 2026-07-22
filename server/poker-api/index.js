@@ -204,6 +204,40 @@ app.post('/api/v1/auth/agent', async (req, res) => {
 // 牌桌
 // ============================================================
 
+// 大屏零输入开桌：新桌默认归属门店（商户可后续在后台绑定到自己门店）
+const DEFAULT_VENUE_ID = '00000000-0000-0000-0000-000000000002';
+
+// 随机分配桌号：4 位数字，大屏易读；冲突重试由调用方处理
+function generateTableCode() {
+  return String(1000 + Math.floor(Math.random() * 9000));
+}
+
+// 零输入开桌（TV 大屏免输入自动调用）：随机桌号建桌，扫码支付激活（付费激活机制）
+app.post('/api/v1/tables', async (req, res) => {
+  try {
+    await query(
+      `INSERT INTO venues (id, name) VALUES ($1, '平台默认门店') ON CONFLICT (id) DO NOTHING`,
+      [DEFAULT_VENUE_ID]
+    );
+    const launchFee = Number.isInteger(req.body?.launchFee) ? req.body.launchFee : 2500;
+    let table = null;
+    for (let i = 0; i < 10 && !table; i++) {
+      const r = await query(
+        `INSERT INTO tables (venue_id, code, label, launch_fee, max_players, status)
+         VALUES ($1, $2, $2, $3, 6, 'idle') ON CONFLICT (code) DO NOTHING
+         RETURNING *`,
+        [DEFAULT_VENUE_ID, generateTableCode(), launchFee]
+      );
+      table = r.rows[0] || null;
+    }
+    if (!table) return res.status(503).json({ error: 'no available table code, retry' });
+    console.log(`[API] Auto-provisioned table ${table.code} (fee ${table.launch_fee})`);
+    res.status(201).json(table);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 获取牌桌信息
 app.get('/api/v1/tables/:code', async (req, res) => {
   try {

@@ -140,7 +140,7 @@ function renderConnect() {
       <p style="color:#aaa;margin-bottom:20px;">输入桌号连接牌桌</p>
       <input id="codeInput" maxlength="6" placeholder="SNGT01" value="" />
       <button onclick="connect()">连接</button>
-      <p style="color:#666;margin-top:30px;font-size:14px;">测试桌号: SNGT01</p>
+      <p style="color:#666;margin-top:30px;font-size:14px;">一般无需输入：TV 首次启动自动开桌；此处仅用于切换到指定桌号</p>
     </div>
   `;
   document.getElementById('codeInput').focus();
@@ -149,9 +149,11 @@ function renderConnect() {
   });
 }
 
-function connect() {
-  tableCode = document.getElementById('codeInput').value.toUpperCase();
+function connect(code) {
+  // 支持零输入自动开桌传入桌号；手动输入场景回退读输入框
+  tableCode = String(code || (document.getElementById('codeInput') || {}).value || '').toUpperCase().trim();
   if (!tableCode) return;
+  localStorage.setItem('tv_table_code', tableCode);
 
   // 服务端要求匿名围观连接必须带 role=tv，否则握手被拒绝（表现为"点了没反应"）
   socket = io(SERVER, { path: '/socket.io/', query: { role: 'tv' } });
@@ -169,6 +171,15 @@ function connect() {
   socket.on('disconnect', () => {
     document.getElementById('app').innerHTML = '<div class="connect-screen"><h1 style="color:#E53935;">已断线，重连中...</h1></div>';
   });
+
+  // 看门狗：连上后 8 秒仍收不到 table_state（桌号已失效/不存在），清记忆重新自动开桌
+  setTimeout(() => {
+    if (!S.phase && !S.seats.length) {
+      localStorage.removeItem('tv_table_code');
+      if (socket) { socket.disconnect(); socket = null; }
+      autoProvision();
+    }
+  }, 8000);
 
   // ============ 事件处理（对齐 tv-display TableViewModel.handleEvent） ============
   socket.on('table_state', (d) => {
@@ -574,8 +585,33 @@ function renderFinished() {
   if (mask) mask.outerHTML = html; else document.body.insertAdjacentHTML('beforeend', html);
 }
 
-// 启动
-renderConnect();
+// ============ 启动：零输入开桌 ============
+// 优先级：URL ?table= > 本地记忆桌号 > 服务端自动开桌；?manual=1 强制手动输入
+function autoProvision() {
+  document.getElementById('app').innerHTML = `
+    <div class="connect-screen">
+      <h1 style="color:#FFD700;font-size:48px;margin-bottom:40px;">🃏 天天扑克锦标赛</h1>
+      <p style="color:#aaa;">正在开启牌桌…</p>
+    </div>`;
+  fetch(`${SERVER}/api/v1/tables`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    .then(r => { if (!r.ok) throw new Error('自动开桌失败 (' + r.status + ')'); return r.json(); })
+    .then(t => { connect(t.code); })
+    .catch(e => {
+      renderConnect();
+      const el = document.querySelector('.connect-screen p');
+      if (el) { el.textContent = e.message + '，请手动输入桌号'; el.style.color = '#E53935'; }
+    });
+}
+
+(function boot() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('manual')) { renderConnect(); return; }
+  const urlTable = (q.get('table') || '').toUpperCase().trim();
+  if (urlTable) { connect(urlTable); return; }
+  const saved = localStorage.getItem('tv_table_code');
+  if (saved) { connect(saved); return; }
+  autoProvision();
+})();
 </script>
 </body>
 </html>
