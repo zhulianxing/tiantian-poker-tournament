@@ -21,6 +21,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'poker-night-secret-2026';
 const activeGames = new Map();
 // 倒计时定时器
 const countdownTimers = new Map();
+// 激活/开赛幂等守卫（AGENT-04 事故：API 满员自动激活 + 手动 /internal/activate 并发导致双开引擎）
+const activatingTournaments = new Set();
+const startingTournaments = new Set();
 // 断线玩家追踪（playerId → { tournamentId, disconnectedAt, missedHands }）
 const disconnectedPlayers = new Map();
 
@@ -176,6 +179,14 @@ async function handleDisconnect(socket) {
 
   const playerId = socket.player.id;
 
+  // 该玩家还有其他在线连接（agent 客户端与主人浏览器同号双开）时，单个 socket 断开不算断线
+  const stillOnline = [...io.sockets.sockets.values()]
+    .some(s => s.id !== socket.id && s.player?.id === playerId);
+  if (stillOnline) {
+    console.log(`[Socket] Socket ${socket.id} closed, player ${playerId} still online via other connection`);
+    return;
+  }
+
   // 查找玩家参与的活跃赛事
   let tournamentId = null;
   for (const [tid, game] of activeGames) {
@@ -277,6 +288,13 @@ app.post('/internal/activate', async (req, res) => {
 // 赛事激活（由支付回调触发）
 // ============================================================
 async function activateTournament(tournamentId) {
+  // 幂等：已激活（倒计时在跑）/ 已开赛 / 正在激活或开赛中的重复触发一律忽略
+  if (activatingTournaments.has(tournamentId) || countdownTimers.has(tournamentId)
+      || activeGames.has(tournamentId) || startingTournaments.has(tournamentId)) {
+    console.log(`[Socket] Tournament ${tournamentId} already activated, skip duplicate activation`);
+    return;
+  }
+  activatingTournaments.add(tournamentId);
   try {
     // 获取赛事信息
     const tResult = await query(
@@ -305,6 +323,7 @@ async function activateTournament(tournamentId) {
 
     console.log(`[Socket] Tournament ${tournament.display_code} activated`);
   } catch (err) {
+    activatingTournaments.delete(tournamentId);
     console.error('[Socket] Activate error:', err.message);
   }
 }
@@ -376,6 +395,13 @@ async function cancelTournament(tournamentId, reason) {
 // 开始赛事
 // ============================================================
 async function startTournament(tournamentId) {
+  // 幂等：引擎已在跑或正在开赛中，拒绝双开
+  if (activeGames.has(tournamentId) || startingTournaments.has(tournamentId)) {
+    console.log(`[Socket] Tournament ${tournamentId} already started, skip duplicate start`);
+    return;
+  }
+  startingTournaments.add(tournamentId);
+  activatingTournaments.delete(tournamentId);
   try {
     // 获取赛事和玩家
     const tResult = await query('SELECT * FROM tournaments WHERE id = $1', [tournamentId]);
@@ -406,11 +432,11 @@ async function startTournament(tournamentId) {
     const room = `table:${tableCode}`;
 
     game.emit = async (event, data) => {
-      // hole_cards 只发给对应玩家，不广播给全房间
+      // hole_cards 发给对应玩家的所有连接（agent 客户端与主人浏览器同号双开都要收到），不广播给全房间
       if (event === 'hole_cards') {
-        const playerSocket = [...io.sockets.sockets.values()]
-          .find(s => s.player?.id === data.playerId);
-        if (playerSocket) playerSocket.emit('hole_cards', data);
+        const playerSockets = [...io.sockets.sockets.values()]
+          .filter(s => s.player?.id === data.playerId);
+        playerSockets.forEach(s => s.emit('hole_cards', data));
       } else {
         io.to(room).emit(event, data);
       }
@@ -435,6 +461,7 @@ async function startTournament(tournamentId) {
     };
 
     activeGames.set(tournamentId, game);
+    startingTournaments.delete(tournamentId);
 
     // 更新状态
     await query('UPDATE tournaments SET status = $1, started_at = NOW() WHERE id = $2',
@@ -452,6 +479,7 @@ async function startTournament(tournamentId) {
 
     console.log(`[Socket] Tournament ${tournament.display_code} started`);
   } catch (err) {
+    startingTournaments.delete(tournamentId);
     console.error('[Socket] Start error:', err.message, err.stack);
   }
 }
