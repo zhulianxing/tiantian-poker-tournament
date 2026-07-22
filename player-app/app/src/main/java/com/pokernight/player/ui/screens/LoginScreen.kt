@@ -1,5 +1,6 @@
 package com.pokernight.player.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -32,12 +33,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pokernight.player.R
 import com.pokernight.player.data.GameViewModel
 import com.pokernight.player.ui.theme.ActionRed
 import com.pokernight.player.ui.theme.BgDark
@@ -82,16 +85,12 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            // 品牌区
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(Color(0xFF1A1A24), RoundedCornerShape(18.dp))
-                    .border(1.5.dp, GoldDark, RoundedCornerShape(18.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("♠", fontSize = 36.sp, color = Gold)
-            }
+            // 品牌区：主 Logo（与网站一致）
+            Image(
+                painter = painterResource(R.drawable.ic_logo),
+                contentDescription = null,
+                modifier = Modifier.size(72.dp),
+            )
             Spacer(Modifier.height(14.dp))
             Text(
                 text = "天天扑克锦标赛",

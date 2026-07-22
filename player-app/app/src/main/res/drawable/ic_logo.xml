@@ -1,17 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 自适应图标前景：主 Logo 缩至 61% 安全区内，内容同 drawable/ic_logo.xml -->
+<!-- 天天扑克锦标赛 主 Logo（与网站 public/assets/logo.svg 一致）：金色筹码 + 黑桃 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
+    android:width="128dp"
+    android:height="128dp"
     android:viewportWidth="128"
     android:viewportHeight="128">
-    <group
-        android:scaleX="0.61"
-        android:scaleY="0.61"
-        android:pivotX="64"
-        android:pivotY="64">
-<!-- 筹码外圈（金色渐变） -->
+
+    <!-- 筹码外圈（金色渐变） -->
     <path android:pathData="M64,2 A62,62 0 1,1 64,126 A62,62 0 1,1 64,2 Z">
         <aapt:attr name="android:fillColor">
             <gradient
@@ -89,5 +85,4 @@
             </gradient>
         </aapt:attr>
     </path>
-    </group>
 </vector>

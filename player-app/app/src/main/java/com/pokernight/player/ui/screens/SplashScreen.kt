@@ -1,5 +1,6 @@
 package com.pokernight.player.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -18,9 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pokernight.player.R
 import com.pokernight.player.data.GameViewModel
 import com.pokernight.player.ui.theme.BgDark
 import com.pokernight.player.ui.theme.Gold
@@ -54,26 +57,12 @@ fun SplashScreen(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // 金色徽章 Logo
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .background(
-                        Brush.radialGradient(
-                            listOf(Color(0xFF2A2410), Color(0xFF141208))
-                        ),
-                        RoundedCornerShape(24.dp),
-                    )
-                    .border(2.dp, GoldDark, RoundedCornerShape(24.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "♠",
-                    fontSize = 48.sp,
-                    color = Gold,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            // 主 Logo（与网站一致）
+            Image(
+                painter = painterResource(R.drawable.ic_logo),
+                contentDescription = null,
+                modifier = Modifier.size(96.dp),
+            )
             Spacer(Modifier.height(20.dp))
             Text(
                 text = "天天扑克锦标赛",

@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -19,11 +20,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import com.pokernight.tvdisplay.R
 import com.pokernight.tvdisplay.data.model.TableState
 import com.pokernight.tvdisplay.data.network.TableViewModel
 import com.pokernight.tvdisplay.ui.components.QrCodeCard
@@ -95,12 +98,20 @@ fun IdleScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // === Header ===
-            Text(
-                text = "♠ 天天扑克锦标赛 ♠",
-                color = GoldAccent,
-                fontSize = 42.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(R.drawable.ic_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(56.dp),
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "天天扑克锦标赛",
+                    color = GoldAccent,
+                    fontSize = 42.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "欢迎光临 · 欢迎入座",

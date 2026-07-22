@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -30,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import com.pokernight.tvdisplay.R
 import com.pokernight.tvdisplay.ui.theme.*
 import com.pokernight.tvdisplay.ui.util.generateQrCode
 
@@ -70,12 +72,20 @@ fun ConnectScreen(
                 .padding(48.dp),
         ) {
             // Title
-            Text(
-                text = "♠ 天天扑克锦标赛 ♠",
-                color = GoldAccent,
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(R.drawable.ic_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "天天扑克锦标赛",
+                    color = GoldAccent,
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
 
             Text(
                 text = "Connect your table display",

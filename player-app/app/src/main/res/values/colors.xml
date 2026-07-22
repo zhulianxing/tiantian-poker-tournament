@@ -15,4 +15,5 @@
     <color name="action_red">#FFE53935</color>
     <color name="action_blue">#FF2196F3</color>
     <color name="disabled_gray">#FF666666</color>
+    <color name="ic_launcher_background">#FF0A0A0F</color>
 </resources>

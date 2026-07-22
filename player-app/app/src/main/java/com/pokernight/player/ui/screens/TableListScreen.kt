@@ -1,5 +1,6 @@
 package com.pokernight.player.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -28,11 +30,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pokernight.player.R
 import com.pokernight.player.data.GameViewModel
 import com.pokernight.player.ui.theme.ActionRed
 import com.pokernight.player.ui.theme.BgDark
@@ -75,12 +79,20 @@ fun TableListScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column {
-                    Text(
-                        text = "♠ 天天扑克锦标赛",
-                        fontSize = 22.sp,
-                        color = Gold,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_logo),
+                            contentDescription = null,
+                            modifier = Modifier.size(26.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "天天扑克锦标赛",
+                            fontSize = 22.sp,
+                            color = Gold,
+                            fontWeight = FontWeight.ExtraBold,
+                        )
+                    }
                     Text(
                         text = "欢迎, ${uiState.nickname ?: "玩家"}",
                         fontSize = 13.sp,
