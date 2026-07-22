@@ -1,10 +1,12 @@
 package com.pokernight.player.data.network
 
 import android.util.Log
+import com.pokernight.player.audio.SoundManager
 import com.pokernight.player.data.model.Card
 import com.pokernight.player.data.model.FinalRankInfo
 import com.pokernight.player.data.model.GameState
 import com.pokernight.player.data.model.HandResultInfo
+import com.pokernight.player.data.model.key
 import io.socket.client.Socket
 import org.json.JSONArray
 import org.json.JSONObject
@@ -107,6 +109,20 @@ class SocketService(
             ))
         }
         return seats
+    }
+
+    private fun parseCards(jsonArr: JSONArray?): List<Card> {
+        if (jsonArr == null) return emptyList()
+        val cards = mutableListOf<Card>()
+        for (i in 0 until jsonArr.length()) {
+            val c = jsonArr.optJSONObject(i) ?: continue
+            cards.add(Card(
+                suit = c.optString("suit", ""),
+                rank = c.optString("rank", ""),
+                value = c.optInt("value", 0),
+            ))
+        }
+        return cards
     }
 
     private fun findMySeat(seats: List<com.pokernight.player.data.model.SeatInfo>): com.pokernight.player.data.model.SeatInfo? {
@@ -213,10 +229,14 @@ class SocketService(
                 finalRankings = emptyList(),
                 handResult = null,
                 communityCards = emptyList(),
+                showdownHands = emptyMap(),
+                winCards = emptySet(),
+                winSeats = emptySet(),
                 pot = 0,
                 currentBet = 0,
                 myCurrentBet = 0,
             )
+            SoundManager.play("start")
             onEvent(EVT_TOURNAMENT_STARTED, data)
             onStateUpdate(currentState)
         }
@@ -230,6 +250,9 @@ class SocketService(
                 stage = "",
                 actionLog = emptyList(),
                 handResult = null,
+                showdownHands = emptyMap(),
+                winCards = emptySet(),
+                winSeats = emptySet(),
             )
             onEvent(EVT_NEW_HAND, data)
             onStateUpdate(currentState)
@@ -253,6 +276,7 @@ class SocketService(
                         ))
                     }
                     currentState = currentState.copy(holeCards = cards)
+                    SoundManager.play("flip")
                     onStateUpdate(currentState)
                 }
             }
@@ -278,12 +302,16 @@ class SocketService(
                     stage = stage,
                     actionLog = emptyList(),
                     handResult = null,
+                    showdownHands = emptyMap(),
+                    winCards = emptySet(),
+                    winSeats = emptySet(),
                     seats = seats,
                     mySeatIndex = mySeat?.seatIndex ?: currentState.mySeatIndex,
                     myChips = mySeat?.chipCount ?: currentState.myChips,
                     myCurrentBet = mySeat?.currentBet ?: 0,
                     isMyTurn = actingIndex == (mySeat?.seatIndex ?: currentState.mySeatIndex),
                 )
+                SoundManager.play("deal")
                 onEvent(EVT_HAND_STARTED, data)
                 onStateUpdate(currentState)
             }
@@ -318,6 +346,7 @@ class SocketService(
                     myChips = mySeat?.chipCount ?: currentState.myChips,
                     myCurrentBet = mySeat?.currentBet ?: currentState.myCurrentBet,
                 )
+                SoundManager.play("flip")
                 onEvent(EVT_STAGE_CHANGED, data)
                 onStateUpdate(currentState)
             }
@@ -346,6 +375,9 @@ class SocketService(
                     myCurrentBet = mySeat?.currentBet ?: currentState.myCurrentBet,
                     isMyTurn = actingIndex == (mySeat?.seatIndex ?: currentState.mySeatIndex),
                 )
+                if (actingIndex == (mySeat?.seatIndex ?: currentState.mySeatIndex)) {
+                    SoundManager.play("turn")
+                }
                 onStateUpdate(currentState)
             }
         }
@@ -382,6 +414,7 @@ class SocketService(
                     myCurrentBet = mySeat?.currentBet ?: currentState.myCurrentBet,
                     actionLog = newLog,
                 )
+                SoundManager.play(if (action == "fold") "fold" else if (action == "check") "check" else "chips")
                 onEvent(EVT_ACTION_RESULT, data)
                 onStateUpdate(currentState)
             }
@@ -389,7 +422,56 @@ class SocketService(
 
         s.on(EVT_SHOWDOWN) { args ->
             val data = if (args.isNotEmpty() && args[0] is JSONObject) args[0] as JSONObject else JSONObject()
-            currentState = currentState.copy(phase = "showdown", stage = "showdown")
+            // 摊牌时服务端下发完整 5 张公共牌
+            val commCards = parseCards(data.optJSONArray("communityCards"))
+            // allResults：所有摊牌玩家的底牌 → seatIndex → 亮出牌（网页 P.showdownHands）
+            val hands = mutableMapOf<Int, List<Card>>()
+            val allResults = data.optJSONArray("allResults")
+            if (allResults != null) {
+                for (i in 0 until allResults.length()) {
+                    val r = allResults.optJSONObject(i) ?: continue
+                    val si = r.optInt("seatIndex", -1)
+                    val hc = parseCards(r.optJSONArray("holeCards"))
+                    if (si >= 0 && hc.isNotEmpty()) hands[si] = hc
+                }
+            }
+            // winners：补充亮牌 + 最佳 5 张牌集合（w.cards，按 Card.key 判等）+ 赢家座位集合
+            val winCards = mutableSetOf<String>()
+            val winSeats = mutableSetOf<Int>()
+            val winners = data.optJSONArray("winners")
+            if (winners != null) {
+                for (i in 0 until winners.length()) {
+                    val w = winners.optJSONObject(i) ?: continue
+                    val si = w.optInt("seatIndex", -1)
+                    val hc = parseCards(w.optJSONArray("holeCards"))
+                    if (si >= 0 && hc.isNotEmpty()) hands[si] = hc
+                    val seat = currentState.seats.find { it.playerId == w.optString("playerId", "") }
+                    if (seat != null && hc.isNotEmpty()) hands[seat.seatIndex] = hc
+                    val ca = w.optJSONArray("cards")
+                    if (ca != null) {
+                        for (j in 0 until ca.length()) {
+                            val c = ca.optJSONObject(j) ?: continue
+                            winCards.add(
+                                Card(
+                                    suit = c.optString("suit", ""),
+                                    rank = c.optString("rank", ""),
+                                    value = c.optInt("value", 0),
+                                ).key()
+                            )
+                        }
+                    }
+                    if (seat != null) winSeats.add(seat.seatIndex) else if (si >= 0) winSeats.add(si)
+                }
+            }
+            currentState = currentState.copy(
+                phase = "showdown",
+                stage = "showdown",
+                communityCards = if (commCards.isNotEmpty()) commCards else currentState.communityCards,
+                showdownHands = hands,
+                winCards = winCards,
+                winSeats = winSeats,
+            )
+            SoundManager.play("reveal")
             onEvent(EVT_SHOWDOWN, data)
             onStateUpdate(currentState)
         }
@@ -417,6 +499,7 @@ class SocketService(
                         handName = handName,
                     ),
                 )
+                SoundManager.play(if (winnerId == AuthManager.getPlayerId()) "win" else "pot")
                 onEvent(EVT_HAND_RESULT, data)
                 onStateUpdate(currentState)
             }
@@ -438,6 +521,9 @@ class SocketService(
                     seats.count { it.status != "eliminated" && it.status != "empty" } + 1
                 } else {
                     currentState.myEliminatedRank
+                }
+                if (playerId == myId) {
+                    SoundManager.play("elim")
                 }
                 currentState = currentState.copy(seats = seats, myEliminatedRank = myRank)
                 onEvent(EVT_PLAYER_ELIMINATED, data)
@@ -492,6 +578,7 @@ class SocketService(
                     sb = sb,
                     bb = bb,
                 )
+                SoundManager.play("blind")
                 onEvent(EVT_BLIND_LEVEL_UP, data)
                 onStateUpdate(currentState)
             }

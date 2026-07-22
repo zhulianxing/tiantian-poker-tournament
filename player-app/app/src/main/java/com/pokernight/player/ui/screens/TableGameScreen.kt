@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,15 +42,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pokernight.player.BuildConfig
+import com.pokernight.player.audio.SoundManager
 import com.pokernight.player.data.GameViewModel
 import com.pokernight.player.data.model.SeatInfo
+import com.pokernight.player.data.model.key
 import com.pokernight.player.ui.components.ActionPanel
 import com.pokernight.player.ui.components.CommunityCardRow
 import com.pokernight.player.ui.components.PokerCard
@@ -57,16 +60,19 @@ import com.pokernight.player.ui.components.RaiseSlider
 import com.pokernight.player.ui.components.SeatView
 import com.pokernight.player.ui.theme.ActionAllInRed
 import com.pokernight.player.ui.theme.BgDark
-import com.pokernight.player.ui.theme.BgElevated
+import com.pokernight.player.ui.theme.FeltGreen
+import com.pokernight.player.ui.theme.FeltSheen
+import com.pokernight.player.ui.theme.GhostBg
 import com.pokernight.player.ui.theme.Gold
 import com.pokernight.player.ui.theme.GoldDark
-import com.pokernight.player.ui.theme.LightGray
-import com.pokernight.player.ui.theme.SurfaceBorder
-import com.pokernight.player.ui.theme.TableGreen
-import com.pokernight.player.ui.theme.TableGreenDark
-import com.pokernight.player.ui.theme.TableGreenMid
-import com.pokernight.player.ui.theme.TableRim
-import com.pokernight.player.ui.theme.TextSecondary
+import com.pokernight.player.ui.theme.GoldLine
+import com.pokernight.player.ui.theme.GoldPillEdge
+import com.pokernight.player.ui.theme.HairlineWhite
+import com.pokernight.player.ui.theme.MaskBg
+import com.pokernight.player.ui.theme.PanelDark
+import com.pokernight.player.ui.theme.PanelGlass
+import com.pokernight.player.ui.theme.TextDim
+import com.pokernight.player.ui.theme.TextPrimary
 import com.pokernight.player.ui.theme.TextTertiary
 import kotlinx.coroutines.delay
 
@@ -84,6 +90,7 @@ fun TableGameScreen(
     var raiseAmount by remember { mutableIntStateOf(0) }
     var showRaisePanel by remember { mutableStateOf(false) }
     var eliminatedDismissed by remember { mutableStateOf(false) }
+    var sndOn by remember { mutableStateOf(SoundManager.isEnabled()) }
     val context = LocalContext.current
 
     // Connect socket on enter
@@ -167,26 +174,40 @@ fun TableGameScreen(
             .fillMaxSize()
             .background(BgDark),
     ) {
-        // 牌桌：木质桌沿 + 绿色毡面（双层椭圆）
+        // 氛围光斑（对齐网页 .glow-a 顶部绿光 / .glow-b 右下金光）
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = (-260).dp)
+                .width(560.dp)
+                .height(560.dp)
+                .background(Brush.radialGradient(listOf(FeltGreen, Color.Transparent))),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = 140.dp, y = 140.dp)
+                .width(480.dp)
+                .height(480.dp)
+                .background(Brush.radialGradient(listOf(Gold.copy(alpha = 0.06f), Color.Transparent))),
+        )
+
+        // 牌桌毡面（对齐网页 .felt：绿色微光渐变 + 金线圆角面板）
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 96.dp, bottom = 210.dp, start = 10.dp, end = 10.dp)
+                .padding(top = 66.dp, bottom = 208.dp, start = 10.dp, end = 10.dp)
+                .clip(RoundedCornerShape(22.dp))
                 .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF4A3A20), TableRim, Color(0xFF241A0C)),
+                    Brush.linearGradient(
+                        colorStops = arrayOf(
+                            0.0f to FeltGreen,
+                            0.55f to FeltSheen,
+                            1.0f to FeltSheen,
+                        ),
                     ),
-                    shape = RoundedCornerShape(130.dp),
                 )
-                .border(1.5.dp, GoldDark.copy(alpha = 0.5f), RoundedCornerShape(130.dp))
-                .padding(10.dp)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(TableGreen, TableGreenMid, TableGreenDark),
-                    ),
-                    shape = RoundedCornerShape(120.dp),
-                )
-                .border(1.dp, Color(0x33FFD700), RoundedCornerShape(120.dp)),
+                .border(1.dp, GoldLine, RoundedCornerShape(22.dp)),
         )
 
         Column(
@@ -201,23 +222,36 @@ fun TableGameScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 6.dp, vertical = 4.dp)
                     .background(
-                        color = Color(0x9912121A),
+                        color = PanelGlass,
                         shape = RoundedCornerShape(12.dp),
                     )
-                    .border(1.dp, SurfaceBorder, RoundedCornerShape(12.dp))
+                    .border(1.dp, HairlineWhite, RoundedCornerShape(12.dp))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("桌号 $tableCode", color = Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Text("L${gameState.blindLevel} ${gameState.sb}/${gameState.bb}", color = TextSecondary, fontSize = 12.sp)
-                Text("第${gameState.handNumber}手", color = TextSecondary, fontSize = 12.sp)
+                Text("L${gameState.blindLevel} ${gameState.sb}/${gameState.bb}", color = TextDim, fontSize = 12.sp)
+                Text("第${gameState.handNumber}手", color = TextDim, fontSize = 12.sp)
                 if (totalCount > 0) {
-                    Text("剩$activeCount/$totalCount", color = TextSecondary, fontSize = 12.sp)
+                    Text("剩$activeCount/$totalCount", color = TextDim, fontSize = 12.sp)
                 }
                 if (gameState.countdown > 0) {
                     Text("⏱ ${gameState.countdown}s", color = Color(0xFFE5484D), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
+                // 音效开关（对应网页牌桌页 sndBtn，状态持久化在 SoundManager）
+                Text(
+                    text = if (sndOn) "🔊" else "🔇",
+                    fontSize = 15.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            sndOn = SoundManager.toggle()
+                            // 与网页一致：打开时试播一声
+                            if (sndOn) SoundManager.play("check")
+                        }
+                        .padding(horizontal = 4.dp),
+                )
             }
 
             // Opponents: top 3 seats
@@ -230,6 +264,9 @@ fun TableGameScreen(
                     SeatView(
                         seat = seats.getOrNull(i) ?: SeatInfo(seatIndex = i, status = "empty"),
                         isMe = i == gameState.mySeatIndex,
+                        isWinner = ((seats.getOrNull(i)?.playerId ?: "") == gameState.handResult?.winnerId && gameState.handResult != null) || gameState.winSeats.contains(i),
+                        revealCards = gameState.showdownHands[i] ?: emptyList(),
+                        winCards = gameState.winCards,
                     )
                 }
             }
@@ -240,10 +277,10 @@ fun TableGameScreen(
             if (gameState.stage.isNotEmpty()) {
                 Text(
                     text = stageLabelCn(gameState.stage),
-                    color = Gold.copy(alpha = 0.7f),
+                    color = Gold.copy(alpha = 0.75f),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp,
+                    letterSpacing = 3.sp,
                 )
                 Spacer(Modifier.height(4.dp))
             }
@@ -251,6 +288,7 @@ fun TableGameScreen(
             // Community cards
             CommunityCardRow(
                 cards = gameState.communityCards,
+                winCards = gameState.winCards,
                 modifier = Modifier.padding(vertical = 4.dp),
             )
 
@@ -261,21 +299,22 @@ fun TableGameScreen(
                 modifier = Modifier
                     .background(
                         brush = Brush.horizontalGradient(
-                            listOf(Color(0x33FFD700), Color(0x1AFFD700), Color(0x33FFD700))
+                            listOf(Color(0x2EFFD700), Color(0x12FFD700), Color(0x2EFFD700))
                         ),
                         shape = RoundedCornerShape(20.dp),
                     )
-                    .border(1.dp, Gold.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 18.dp, vertical = 5.dp),
+                    .border(1.dp, GoldPillEdge, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 22.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("底池", color = TextSecondary, fontSize = 13.sp)
+                Text("底池", color = Gold, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = "${gameState.pot}",
                     color = Gold,
-                    fontSize = 19.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp,
                 )
             }
 
@@ -289,10 +328,16 @@ fun TableGameScreen(
                 SeatView(
                     seat = seats.getOrNull(3) ?: SeatInfo(seatIndex = 3, status = "empty"),
                     isMe = 3 == gameState.mySeatIndex,
+                    isWinner = ((seats.getOrNull(3)?.playerId ?: "") == gameState.handResult?.winnerId && gameState.handResult != null) || gameState.winSeats.contains(3),
+                    revealCards = gameState.showdownHands[3] ?: emptyList(),
+                    winCards = gameState.winCards,
                 )
                 SeatView(
                     seat = seats.getOrNull(4) ?: SeatInfo(seatIndex = 4, status = "empty"),
                     isMe = 4 == gameState.mySeatIndex,
+                    isWinner = ((seats.getOrNull(4)?.playerId ?: "") == gameState.handResult?.winnerId && gameState.handResult != null) || gameState.winSeats.contains(4),
+                    revealCards = gameState.showdownHands[4] ?: emptyList(),
+                    winCards = gameState.winCards,
                 )
             }
 
@@ -302,7 +347,7 @@ fun TableGameScreen(
             if (gameState.actionLog.isNotEmpty()) {
                 Text(
                     text = gameState.actionLog.joinToString(" · "),
-                    color = TextTertiary,
+                    color = TextDim,
                     fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -320,11 +365,13 @@ fun TableGameScreen(
                     card = gameState.holeCards.getOrNull(0),
                     isBig = true,
                     faceDown = gameState.holeCards.isEmpty(),
+                    win = gameState.holeCards.getOrNull(0)?.let { it.key() in gameState.winCards } == true,
                 )
                 PokerCard(
                     card = gameState.holeCards.getOrNull(1),
                     isBig = true,
                     faceDown = gameState.holeCards.isEmpty(),
+                    win = gameState.holeCards.getOrNull(1)?.let { it.key() in gameState.winCards } == true,
                 )
             }
 
@@ -335,8 +382,8 @@ fun TableGameScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .background(Color(0x6612121A), RoundedCornerShape(10.dp))
-                    .border(1.dp, SurfaceBorder, RoundedCornerShape(10.dp))
+                    .background(PanelGlass, RoundedCornerShape(10.dp))
+                    .border(1.dp, HairlineWhite, RoundedCornerShape(10.dp))
                     .padding(horizontal = 14.dp, vertical = 7.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -348,7 +395,7 @@ fun TableGameScreen(
                 )
                 Text(
                     text = "已下注 ${gameState.myCurrentBet}",
-                    color = TextSecondary,
+                    color = TextDim,
                     fontSize = 14.sp,
                 )
             }
@@ -359,7 +406,6 @@ fun TableGameScreen(
             if (gameState.isMyTurn && turnRemainingMs > 0L) {
                 val total = gameState.turnTimeoutMs.coerceAtLeast(3000).toLong()
                 val frac = (turnRemainingMs.toFloat() / total.toFloat()).coerceIn(0f, 1f)
-                val barColor = lerp(ActionAllInRed, Gold, frac)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -371,14 +417,14 @@ fun TableGameScreen(
                             .weight(1f)
                             .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(SurfaceBorder),
+                            .background(GhostBg),
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(frac)
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(barColor),
+                                .background(Brush.horizontalGradient(listOf(Gold, ActionAllInRed))),
                         )
                     }
                     Spacer(Modifier.width(8.dp))
@@ -391,38 +437,24 @@ fun TableGameScreen(
                 }
             }
 
-            // 加注抽屉：滑杆 + 快捷档（½底池 / 底池 / 全下）
+            // 加注抽屉（对齐网页 .raise-drawer：金色大额 + 金滑杆 + 快捷注额）
             if (gameState.isMyTurn && showRaisePanel) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 4.dp)
-                        .background(BgElevated, RoundedCornerShape(12.dp))
-                        .border(1.dp, Gold.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .background(PanelDark, RoundedCornerShape(14.dp))
+                        .border(1.dp, HairlineWhite, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
                 ) {
-                    Row(
+                    Text(
+                        text = "加注到 $raiseAmount",
+                        color = Gold,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("加注到", color = TextSecondary, fontSize = 13.sp)
-                        Text(
-                            text = "$raiseAmount",
-                            color = Gold,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "✕",
-                            color = TextTertiary,
-                            fontSize = 16.sp,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { showRaisePanel = false }
-                                .padding(horizontal = 8.dp, vertical = 2.dp),
-                        )
-                    }
+                    )
                     RaiseSlider(
                         minValue = minRaise,
                         maxValue = maxRaise,
@@ -436,11 +468,17 @@ fun TableGameScreen(
                         QuickRaiseButton("½底池", Modifier.weight(1f)) {
                             raiseAmount = (gameState.pot / 2).coerceIn(minRaise, maxRaise)
                         }
-                        QuickRaiseButton("底池", Modifier.weight(1f)) {
+                        QuickRaiseButton("1底池", Modifier.weight(1f)) {
                             raiseAmount = gameState.pot.coerceIn(minRaise, maxRaise)
+                        }
+                        QuickRaiseButton("2底池", Modifier.weight(1f)) {
+                            raiseAmount = (gameState.pot * 2).coerceIn(minRaise, maxRaise)
                         }
                         QuickRaiseButton("全下", Modifier.weight(1f)) {
                             raiseAmount = maxRaise
+                        }
+                        QuickRaiseButton("✕", Modifier.weight(1f)) {
+                            showRaisePanel = false
                         }
                     }
                 }
@@ -491,20 +529,16 @@ fun TableGameScreen(
             }
         }
 
-        // 每手结果浮层：赢家 + 赢取金额 + 牌型（我赢金色，否则灰）
+        // 每手结果横幅（对齐网页 .hand-banner：顶部居中浮层，深底金边金字）
         gameState.handResult?.let { hr ->
             val isMe = hr.winnerId == viewModel.getPlayerId()
             Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 32.dp)
-                    .background(Color(0xF212121A), RoundedCornerShape(16.dp))
-                    .border(
-                        1.5.dp,
-                        if (isMe) Gold else SurfaceBorder,
-                        RoundedCornerShape(16.dp),
-                    )
-                    .padding(horizontal = 24.dp, vertical = 14.dp),
+                    .align(Alignment.TopCenter)
+                    .padding(top = 64.dp)
+                    .background(Color(0xF2101018), RoundedCornerShape(14.dp))
+                    .border(1.dp, GoldDark, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 26.dp, vertical = 12.dp),
             ) {
                 Text(
                     text = buildString {
@@ -512,9 +546,9 @@ fun TableGameScreen(
                         append(hr.winAmount)
                         if (hr.handName.isNotEmpty()) append(" · ${hr.handName}")
                     },
-                    color = if (isMe) Gold else LightGray,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    color = Gold,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
@@ -533,11 +567,11 @@ fun TableGameScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .padding(32.dp)
-                            .background(BgElevated, RoundedCornerShape(20.dp))
-                            .border(1.dp, SurfaceBorder, RoundedCornerShape(20.dp))
-                            .padding(horizontal = 32.dp, vertical = 28.dp),
+                            .background(MaskBg, RoundedCornerShape(22.dp))
+                            .border(1.dp, GoldDark, RoundedCornerShape(22.dp))
+                            .padding(horizontal = 38.dp, vertical = 30.dp),
                     ) {
-                        Text("淘汰", color = ActionAllInRed, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("淘汰", color = Gold, fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                         Spacer(Modifier.height(8.dp))
                         Text("第 $rank 名", color = Gold, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold)
                         Spacer(Modifier.height(20.dp))
@@ -545,8 +579,8 @@ fun TableGameScreen(
                             Button(
                                 onClick = { eliminatedDismissed = true },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = SurfaceBorder,
-                                    contentColor = Color.White,
+                                    containerColor = GhostBg,
+                                    contentColor = TextPrimary,
                                 ),
                                 shape = RoundedCornerShape(10.dp),
                             ) {
@@ -581,9 +615,9 @@ fun TableGameScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .padding(32.dp)
-                        .background(BgElevated, RoundedCornerShape(20.dp))
-                        .border(1.dp, SurfaceBorder, RoundedCornerShape(20.dp))
-                        .padding(horizontal = 32.dp, vertical = 28.dp),
+                        .background(MaskBg, RoundedCornerShape(22.dp))
+                        .border(1.dp, GoldDark, RoundedCornerShape(22.dp))
+                        .padding(horizontal = 38.dp, vertical = 30.dp),
                 ) {
                     Text("🏆 赛事结束", color = Gold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     val myRank = gameState.finalRankings.find { it.playerId == viewModel.getPlayerId() }?.rank
@@ -600,7 +634,13 @@ fun TableGameScreen(
                     ) {
                         gameState.finalRankings.sortedBy { it.rank }.forEach { r ->
                             Row(
-                                modifier = Modifier.width(240.dp),
+                                modifier = Modifier
+                                    .width(240.dp)
+                                    .then(
+                                        if (r.playerId == viewModel.getPlayerId())
+                                            Modifier.background(Color(0x1446A758), RoundedCornerShape(8.dp))
+                                        else Modifier,
+                                    ),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
                                 Text(
@@ -611,7 +651,7 @@ fun TableGameScreen(
                                 )
                                 Text(
                                     text = "${r.chips}",
-                                    color = TextSecondary,
+                                    color = TextDim,
                                     fontSize = 13.sp,
                                 )
                             }
@@ -652,10 +692,10 @@ private fun QuickRaiseButton(
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF2A2A38),
-            contentColor = Gold,
+            containerColor = GhostBg,
+            contentColor = TextPrimary,
         ),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(10.dp),
         modifier = modifier.height(34.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 2.dp),
     ) {

@@ -189,6 +189,48 @@ input[type=range]{width:100%;accent-color:var(--gold);height:32px}
 .reconnect-bar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(229,72,77,.92);color:#fff;text-align:center;padding:6px;font-size:13px}
 .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:90;background:rgba(16,16,24,.95);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px 22px;font-size:14px;display:none}
 .toast.on{display:block}
+
+/* ==== 竖屏一屏化（PPT 式） ==== */
+html{scroll-snap-type:y proximity}
+.game-page{min-height:calc(100dvh - 54px);display:flex;flex-direction:column;scroll-snap-align:start}
+.game-sub{scroll-snap-align:start}
+#viewTable .felt{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
+.icon-btn{background:rgba(255,255,255,.08);color:var(--txt);border:none;border-radius:10px;padding:8px 10px;font-size:15px;cursor:pointer}
+/* 摊牌赢家高亮 */
+.pcard.win{border-color:var(--gold);box-shadow:0 0 14px rgba(255,215,0,.55);transform:translateY(-4px)}
+.mini-card.win{outline:2px solid var(--gold);box-shadow:0 0 8px rgba(255,215,0,.6)}
+.seat.winner{border-color:var(--gold)!important;box-shadow:0 0 24px rgba(255,215,0,.4);background:rgba(255,215,0,.08)}
+.seat.loser-dim{opacity:.35}
+.seat .win-badge{position:absolute;top:-12px;right:-6px;font-size:17px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
+@media(max-width:767px){
+  .wrap{padding:12px 12px 40px}
+  #viewTable .page-head h1{font-size:17px}
+  #viewTable .page-head .sub{display:none}
+  #viewTable .status-bar{flex-wrap:nowrap;overflow-x:auto;margin-top:8px;gap:6px;scrollbar-width:none}
+  #viewTable .status-bar::-webkit-scrollbar{display:none}
+  #viewTable .chip{padding:5px 10px;font-size:11px;white-space:nowrap}
+  #viewTable .panel{margin-top:8px;padding:12px}
+  #viewTable .felt{margin-top:8px;padding:10px 8px;border-radius:16px}
+  #viewTable .seat{min-width:92px;padding:6px 6px;border-radius:10px}
+  #viewTable .seat-row{gap:6px}
+  #viewTable .seat .s-nick{font-size:11px}
+  #viewTable .seat .s-chips{font-size:14px}
+  #viewTable .seat .s-bet,#viewTable .seat .s-status,#viewTable .seat .s-last{font-size:10px}
+  #viewTable .table-mid{margin:8px 0;gap:6px}
+  #viewTable .stage-badge{font-size:11px}
+  #viewTable .pcard{width:38px;height:54px;border-radius:6px}
+  #viewTable .pcard .r{font-size:11px;top:3px;left:4px}
+  #viewTable .pcard .s{font-size:18px}
+  #viewTable .my-cards .pcard{width:50px;height:70px}
+  #viewTable .my-cards .pcard .r{font-size:13px}
+  #viewTable .my-cards .pcard .s{font-size:22px}
+  #viewTable .pot-pill{font-size:14px;padding:4px 16px}
+  #viewTable .my-zone{margin-top:8px;gap:8px}
+  #viewTable .action-panel{padding:10px}
+  #viewTable button.act{min-width:76px;padding:11px 12px;font-size:15px}
+  #viewTable .mini-card{width:20px;height:28px;font-size:10px}
+}
+
 </style>
 </head>
 <body>
@@ -268,11 +310,13 @@ input[type=range]{width:100%;accent-color:var(--gold);height:32px}
 
   <!-- ========== 视图 3：牌桌（大厅 + 对局） ========== -->
   <div class="view" id="viewTable">
+   <div class="game-page">
     <div class="page-head">
       <h1>♠ <span id="headTable">牌桌</span></h1>
       <span class="sub" id="headSub">天天扑克 SNG</span>
       <span class="badge-live" id="liveBadge">● LIVE</span>
       <span style="margin-left:auto"></span>
+      <button class="icon-btn" id="sndBtn" onclick="toggleSnd()" title="音效开关">🔊</button>
       <button class="ghost" id="backLobbyBtn" onclick="backToLobby()">返回大厅</button>
       <button class="danger" id="leaveBtn" style="display:none" onclick="doLeave()">离开座位</button>
     </div>
@@ -341,8 +385,9 @@ input[type=range]{width:100%;accent-color:var(--gold);height:32px}
       </div>
     </div>
 
+   </div>
     <!-- 流水 + 排行 -->
-    <div class="side-grid" style="margin-top:14px;">
+    <div class="side-grid game-sub" style="margin-top:14px;">
       <div class="panel" style="margin-top:0">
         <h2>对局动态</h2>
         <div class="log-box mono" id="logBox"></div>
@@ -373,7 +418,7 @@ const P = {
   pot: 0, currentBet: 0, sb: 10, bb: 20, blindLevel: 1, countdown: 0,
   actingIndex: -1, dealerIndex: 0,
   seats: [], community: [], myCards: [], showdownHands: {}, lastActions: {},
-  rankings: [], lobbyPlayers: [],
+  rankings: [], lobbyPlayers: [], showInfo: null,
   pollTimer: null, timerAnim: null, confirmBtn: null,
 };
 
@@ -408,12 +453,13 @@ function suitOf(c) {
   return { spades:'♠', hearts:'♥', diamonds:'♦', clubs:'♣', spade:'♠', heart:'♥', diamond:'♦', club:'♣' }[s.toLowerCase()] || s;
 }
 function isRed(c) { const s = suitOf(c); return s === '♥' || s === '♦'; }
-function cardHTML(c) {
+function cKey(c) { return String(c.rank) + suitOf(c); }
+function cardHTML(c, win) {
   if (!c) return '<div class="pcard back"></div>';
-  return `<div class="pcard ${isRed(c) ? 'red' : 'black'}"><span class="r">${esc(c.rank)}</span><span class="s">${esc(suitOf(c))}</span></div>`;
+  return `<div class="pcard ${isRed(c) ? 'red' : 'black'}${win ? ' win' : ''}"><span class="r">${esc(c.rank)}</span><span class="s">${esc(suitOf(c))}</span></div>`;
 }
-function miniCardHTML(c) {
-  return `<div class="mini-card ${isRed(c) ? 'red' : 'black'}">${esc(c.rank)}${esc(suitOf(c))}</div>`;
+function miniCardHTML(c, win) {
+  return `<div class="mini-card ${isRed(c) ? 'red' : 'black'}${win ? ' win' : ''}">${esc(c.rank)}${esc(suitOf(c))}</div>`;
 }
 function stageLabel(s) {
   return { preflop:'翻牌前', flop:'翻牌圈', turn:'转牌圈', river:'河牌圈', showdown:'摊牌' }[String(s || '').toLowerCase()] || String(s || '');
@@ -435,6 +481,73 @@ function toCall() {
   if (!me) return 0;
   return Math.max(0, P.currentBet - (me.currentBet || 0));
 }
+
+// ============ 音效（Web Audio 合成，无外部素材） ============
+const SND = {
+  ctx: null,
+  muted: localStorage.getItem('player_snd') === '0',
+  ensure() {
+    if (!this.ctx) {
+      try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  tone(freq, dur, type, vol, delay) {
+    const ctx = this.ensure(); if (!ctx) return;
+    const t0 = ctx.currentTime + (delay || 0);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.12, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  slide(f1, f2, dur, type, vol) {
+    const ctx = this.ensure(); if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type || 'triangle';
+    o.frequency.setValueAtTime(f1, t0);
+    o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.1, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  play(name) {
+    if (this.muted) return;
+    switch (name) {
+      case 'deal': this.slide(900, 300, 0.12, 'triangle', 0.08); break;
+      case 'flip': this.tone(1200, 0.07, 'square', 0.05); break;
+      case 'chips': this.tone(2400, 0.05, 'square', 0.05); this.tone(1900, 0.06, 'square', 0.05, 0.06); break;
+      case 'check': this.tone(700, 0.06, 'sine', 0.08); break;
+      case 'fold': this.slide(500, 180, 0.18, 'sine', 0.08); break;
+      case 'turn': this.tone(880, 0.12, 'sine', 0.14); this.tone(1320, 0.16, 'sine', 0.14, 0.13); break;
+      case 'reveal': this.tone(1046, 0.1, 'triangle', 0.1); this.tone(784, 0.12, 'triangle', 0.1, 0.1); break;
+      case 'pot': this.tone(1568, 0.08, 'square', 0.05); this.tone(2093, 0.1, 'square', 0.05, 0.08); break;
+      case 'win': [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.16, 'triangle', 0.12, i * 0.09)); break;
+      case 'elim': [400, 320, 240, 160].forEach((f, i) => this.tone(f, 0.2, 'sine', 0.1, i * 0.11)); break;
+      case 'start': [392, 523, 659, 784].forEach((f, i) => this.tone(f, 0.18, 'triangle', 0.12, i * 0.1)); break;
+      case 'blind': this.tone(660, 0.09, 'sine', 0.09); this.tone(660, 0.09, 'sine', 0.09, 0.14); break;
+    }
+  },
+  toggle() {
+    this.muted = !this.muted;
+    localStorage.setItem('player_snd', this.muted ? '0' : '1');
+    return !this.muted;
+  },
+};
+function toggleSnd() {
+  const on = SND.toggle();
+  $('sndBtn').textContent = on ? '🔊' : '🔇';
+  if (on) SND.play('check');
+}
+// 首次交互解锁音频（浏览器自动播放策略）
+document.addEventListener('pointerdown', () => { if (!SND.muted) SND.ensure(); });
+
 
 // ============ 视图切换 ============
 function showView(v) {
@@ -669,6 +782,7 @@ function connectSocket() {
     hideMasks();
     log('*** 比赛开始 ***', 'gold');
     toast('比赛开始！');
+    SND.play('start');
     localStorage.setItem(LS.table, P.tableCode);
     renderAll();
   });
@@ -676,13 +790,14 @@ function connectSocket() {
     P.stage = 'preflop';
     if (d.dealerIndex != null) P.dealerIndex = d.dealerIndex;
     if (d.seats) P.seats = d.seats;
-    P.community = []; P.showdownHands = {}; P.lastActions = {};
+    P.community = []; P.showdownHands = {}; P.lastActions = {}; P.showInfo = null;
     hideBanner();
   });
   s.on('hole_cards', (d) => {
     if (P.me && d.playerId === P.me.id) {
       P.myCards = d.cards || [];
       log('我的底牌: ' + P.myCards.map(c => c.rank + suitOf(c)).join(' '), 'ok');
+      SND.play('flip');
       renderMyZone();
     }
   });
@@ -693,9 +808,10 @@ function connectSocket() {
     P.actingIndex = d.actingIndex ?? -1;
     if (d.seats) P.seats = d.seats;
     if (d.dealerIndex != null) P.dealerIndex = d.dealerIndex;
-    P.community = []; P.showdownHands = {}; P.lastActions = {};
+    P.community = []; P.showdownHands = {}; P.lastActions = {}; P.showInfo = null;
     hideBanner(); closeRaise(); stopTimer();
     log(`—— 第 ${P.handNumber} 手开始 ——`);
+    SND.play('deal');
     renderAll();
   });
   s.on('stage_changed', (d) => {
@@ -706,6 +822,7 @@ function connectSocket() {
     if (d.seats && d.seats.length) P.seats = d.seats;
     P.lastActions = {};
     log(`阶段: ${stageLabel(P.stage)}，公共牌 ${P.community.map(c => c.rank + suitOf(c)).join(' ')}`);
+    SND.play('flip');
     renderAll();
   });
   s.on('turn_changed', (d) => {
@@ -716,6 +833,7 @@ function connectSocket() {
     if (myTurn()) {
       log('*** 轮到我行动 ***', 'gold');
       if (navigator.vibrate) navigator.vibrate(200);
+      SND.play('turn');
     }
     renderAll();
   });
@@ -729,6 +847,7 @@ function connectSocket() {
     const who = (seat && seat.nickname) || d.playerId;
     if (seat) P.lastActions[seat.seatIndex] = actionLabel(d.action) + (d.amount ? ' ' + d.amount : '');
     log(`${who}: ${actionLabel(d.action)}${d.amount ? ' ' + d.amount : ''}`);
+    SND.play(d.action === 'fold' ? 'fold' : d.action === 'check' ? 'check' : 'chips');
     stopTimer();
     renderAll();
   });
@@ -749,6 +868,16 @@ function connectSocket() {
       const seat = P.seats.find(x => x.playerId === w.playerId);
       return `${(seat && seat.nickname) || w.playerId}(${w.handName || ''})`;
     });
+    // 赢家牌型组合高亮数据（w.cards 是引擎评出的最佳 5 张）
+    const winCards = new Set(), winSeats = new Set();
+    (d.winners || []).forEach(w => {
+      (w.cards || []).forEach(c => winCards.add(cKey(c)));
+      const wseat = P.seats.find(x => x.playerId === w.playerId);
+      if (wseat) winSeats.add(wseat.seatIndex);
+      else if (w.seatIndex >= 0) winSeats.add(w.seatIndex);
+    });
+    P.showInfo = winCards.size ? { winCards, winSeats } : null;
+    SND.play('reveal');
     log(`摊牌，赢家: ${names.join(', ')}`, 'gold');
     renderAll();
   });
@@ -761,6 +890,7 @@ function connectSocket() {
     const mine = P.me && d.winnerId === P.me.id;
     log(`第 ${d.handNumber} 手结束：${wname} 赢得 ${d.winAmount ?? d.pot}`, mine ? 'gold' : '');
     showBanner(`🏆 ${wname} 赢得 ${d.winAmount ?? d.pot}${d.handName ? ' · ' + d.handName : ''}`);
+    SND.play(mine ? 'win' : 'pot');
     renderAll();
   });
   s.on('player_eliminated', (d) => {
@@ -771,6 +901,7 @@ function connectSocket() {
     if (mine) {
       const alive = P.seats.filter(x => x.status !== 'eliminated' && x.status !== 'empty').length;
       showEliminated(alive + 1);
+      SND.play('elim');
     }
     renderAll();
   });
@@ -778,6 +909,7 @@ function connectSocket() {
     P.blindLevel = d.level ?? P.blindLevel; P.sb = d.sb ?? P.sb; P.bb = d.bb ?? P.bb;
     log(`盲注升到 L${P.blindLevel}: ${P.sb}/${P.bb}`);
     toast(`盲注升级 L${P.blindLevel}：${P.sb}/${P.bb}`);
+    SND.play('blind');
     renderAll();
   });
   s.on('tournament_finished', (d) => {
@@ -964,6 +1096,10 @@ function seatHTML(s) {
   if (s.seatIndex === P.actingIndex && st !== 'empty') cls.push('acting');
   const me = P.me && s.playerId === P.me.id;
   if (me) cls.push('me');
+  if (P.showInfo && st !== 'empty') {
+    if (P.showInfo.winSeats.has(s.seatIndex)) cls.push('winner');
+    else if (P.showdownHands[s.seatIndex]) cls.push('loser-dim');
+  }
   const statusText = st === 'empty' ? '空位'
     : st === 'eliminated' ? '淘汰'
     : st === 'folded' ? '已弃牌'
@@ -972,13 +1108,13 @@ function seatHTML(s) {
     : '';
   const reveal = P.showdownHands[s.seatIndex];
   const last = P.lastActions[s.seatIndex];
-  return `<div class="${cls.join(' ')}">
+  return `<div class="${cls.join(' ')}">${P.showInfo && P.showInfo.winSeats.has(s.seatIndex) ? '<span class="win-badge">🏆</span>' : ''}
     <div class="s-nick">${esc(s.avatar || '🃏')} ${esc(s.nickname || '玩家' + (s.seatIndex + 1))}${me ? '<span class="me-tag">我</span>' : ''}${s.seatIndex === P.dealerIndex && st !== 'empty' ? '<span class="d-badge">D</span>' : ''}</div>
     <div class="s-chips">${s.chipCount ?? 0}</div>
     ${s.currentBet > 0 ? `<div class="s-bet">下注 ${s.currentBet}</div>` : ''}
     ${last && st !== 'empty' ? `<div class="s-last">${esc(last)}</div>` : ''}
     ${statusText ? `<div class="s-status">${statusText}</div>` : ''}
-    ${(reveal && reveal.length) ? `<div class="reveal">${reveal.slice(0, 2).map(miniCardHTML).join('')}</div>` : ''}
+    ${(reveal && reveal.length) ? `<div class="reveal">${reveal.slice(0, 2).map(c => miniCardHTML(c, !!(P.showInfo && P.showInfo.winCards.has(cKey(c))))).join('')}</div>` : ''}
   </div>`;
 }
 
@@ -989,7 +1125,7 @@ function renderTable() {
   }
   $('seatsTop').innerHTML = seats.slice(0, 3).map(seatHTML).join('');
   $('seatsBottom').innerHTML = seats.slice(3, 6).reverse().map(seatHTML).join('');
-  $('community').innerHTML = [0, 1, 2, 3, 4].map(i => cardHTML(P.community[i] || null)).join('');
+  $('community').innerHTML = [0, 1, 2, 3, 4].map(i => cardHTML(P.community[i] || null, !!(P.showInfo && P.community[i] && P.showInfo.winCards.has(cKey(P.community[i]))))).join('');
   $('stageBadge').textContent = P.phase === 'started' && P.stage ? stageLabel(P.stage) : '';
   const pill = $('potPill');
   if (P.pot > 0) { pill.style.display = ''; $('potVal').textContent = P.pot; } else pill.style.display = 'none';
@@ -998,7 +1134,7 @@ function renderTable() {
 function renderMyZone() {
   const me = mySeat();
   $('myCards').innerHTML = P.myCards.length
-    ? P.myCards.map(cardHTML).join('')
+    ? P.myCards.map(c => cardHTML(c, !!(P.showInfo && P.showInfo.winCards.has(cKey(c))))).join('')
     : (P.phase === 'started' && me && me.status !== 'eliminated' ? '<span class="hint">等待发牌…</span>' : '');
   $('myMeta').innerHTML = me
     ? `筹码 <b>${me.chipCount ?? 0}</b>${me.currentBet > 0 ? ` · 已下注 ${me.currentBet}` : ''} · 座位 #${me.seatIndex}`
@@ -1109,6 +1245,7 @@ function showFinished() {
   } else {
     showView('auth');
   }
+  const sb = $('sndBtn'); if (sb) sb.textContent = SND.muted ? '🔇' : '🔊';
 })();
 </script>
 </body>

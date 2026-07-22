@@ -6,75 +6,99 @@
 <title>天天扑克锦标赛 — TV Display</title>
 <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
 <style>
+:root{--gold:#FFD700;--gold2:#c9a227;--bg:#07070c;--panel:rgba(255,255,255,.035);--line:rgba(201,162,39,.22);--txt:#e8e8ec;--dim:#9c9ca8;--navH:clamp(44px,6.5vh,64px)}
 * { margin:0; padding:0; box-sizing:border-box; }
-/* 面向投影/电视大屏：所有尺寸随视口高度缩放（1080p 基准，4K 同比放大），小窗有 clamp 下限与紧凑模式 */
-body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; height:100vh; height:100dvh; overflow:hidden; }
-.container { display:flex; flex-direction:column; height:100vh; height:100dvh; }
-.top-bar { display:flex; justify-content:space-around; padding:1.2vh 2vw; background:#0D5C32; font-size:clamp(15px,2.2vh,30px); }
-.top-bar span { color:#FFD700; font-weight:bold; }
+/* 面向投影/电视大屏：所有尺寸随视口高度缩放（1080p 基准，4K 同比放大），小窗有 clamp 下限与紧凑模式；视觉风格对齐首页 */
+body { background:var(--bg); color:var(--txt); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; height:100vh; height:100dvh; overflow:hidden; }
+/* 首页同款氛围辉光 */
+.glow { position:fixed; border-radius:50%; pointer-events:none; filter:blur(90px); z-index:0; }
+.glow-a { top:-260px; left:50%; transform:translateX(-50%); width:820px; height:820px; background:rgba(13,90,50,.34); }
+.glow-b { top:38%; left:-260px; width:560px; height:560px; background:rgba(201,162,39,.10); }
+.glow-c { bottom:-200px; right:-200px; width:620px; height:620px; background:rgba(255,215,0,.07); }
+#app { position:relative; z-index:1; }
+/* 首页同款导航（fixed 悬浮，不占牌桌布局） */
+nav { position:fixed; top:0; left:0; right:0; height:var(--navH); z-index:100; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); background:rgba(7,7,12,.72); border-bottom:1px solid rgba(201,162,39,.14); }
+.nav-in { height:100%; padding:0 2vw; display:flex; align-items:center; gap:0.8vw; }
+.nav-in img { width:clamp(26px,4.2vh,40px); height:clamp(26px,4.2vh,40px); }
+.nav-name { font-weight:800; font-size:clamp(14px,2.2vh,22px); letter-spacing:1px; }
+.nav-name span { display:block; font-size:clamp(8px,1.1vh,11px); letter-spacing:3px; color:var(--gold2); font-weight:500; }
+.nav-links { margin-left:auto; display:flex; gap:6px; }
+.nav-links a { font-size:clamp(11px,1.6vh,15px); color:var(--dim); padding:8px 14px; border-radius:10px; text-decoration:none; transition:.2s; }
+.nav-links a:hover { color:var(--gold); background:rgba(255,215,0,.06); }
+.nav-links a.nav-cta { font-weight:700; color:#1a1400; background:linear-gradient(135deg,#FFD700,#c9a227); }
+.container { display:flex; flex-direction:column; height:100vh; height:100dvh; padding-top:var(--navH); }
+.top-bar { display:flex; justify-content:space-around; padding:1.2vh 2vw; background:rgba(255,255,255,.03); border-bottom:1px solid var(--line); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); font-size:clamp(15px,2.2vh,30px); }
+.top-bar > span { color:var(--dim); }
+.top-bar > span > span { color:var(--gold); font-weight:bold; }
 .table-area { flex:1; display:flex; align-items:center; justify-content:center; position:relative; min-height:0; }
 .seats-top, .seats-bottom { display:flex; gap:clamp(16px,3vw,64px); justify-content:center; }
-.seat { background:#2a2a4a; border-radius:12px; padding:1.1vh 1.1vw; min-width:clamp(110px,11vw,230px); text-align:center; border:2px solid #333; }
-.seat.active { border-color:#E53935; animation:pulse 1s infinite; }
+.seat { background:var(--panel); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border-radius:14px; padding:1.1vh 1.1vw; min-width:clamp(110px,11vw,230px); text-align:center; border:1px solid rgba(255,255,255,.08); }
+.seat.active { border-color:var(--gold); box-shadow:0 0 18px rgba(255,215,0,.25); animation:pulse 1s infinite; }
 .seat.folded { opacity:0.4; }
-.seat.allin { border-color:#FFD700; }
+.seat.allin { border-color:#ff6b3d; }
 .seat.eliminated { opacity:0.25; }
-.seat.empty { color:#666; }
+.seat.empty { color:#55555f; }
 .seat .nick { font-size:clamp(12px,1.8vh,24px); margin-bottom:0.4vh; }
-.seat .d-badge { display:inline-block; background:#FFD700; color:#000; border-radius:50%; width:clamp(14px,1.9vh,24px); height:clamp(14px,1.9vh,24px); font-size:clamp(10px,1.2vh,15px); line-height:clamp(14px,1.9vh,24px); margin-left:4px; vertical-align:middle; }
-.seat .chips { font-size:clamp(15px,2.6vh,34px); color:#4CAF50; font-weight:bold; }
-.seat .bet { font-size:clamp(10px,1.5vh,19px); color:#FFD700; margin-top:0.2vh; }
-.seat .status { font-size:clamp(10px,1.5vh,19px); margin-top:0.4vh; color:#aaa; }
+.seat .d-badge { display:inline-block; background:linear-gradient(135deg,#FFD700,#c9a227); color:#1a1400; border-radius:50%; width:clamp(14px,1.9vh,24px); height:clamp(14px,1.9vh,24px); font-size:clamp(10px,1.2vh,15px); line-height:clamp(14px,1.9vh,24px); margin-left:4px; vertical-align:middle; font-weight:900; }
+.seat .chips { font-size:clamp(15px,2.6vh,34px); color:var(--gold); font-weight:bold; }
+.seat .bet { font-size:clamp(10px,1.5vh,19px); color:var(--gold2); margin-top:0.2vh; }
+.seat .status { font-size:clamp(10px,1.5vh,19px); margin-top:0.4vh; color:var(--dim); }
 .seat .reveal { display:flex; gap:0.4vw; justify-content:center; margin-top:0.6vh; }
 .mini-card { width:clamp(20px,2.8vh,34px); height:clamp(28px,3.9vh,48px); background:#F5F5F0; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:clamp(11px,1.7vh,20px); font-weight:bold; }
 .mini-card.red { color:#E53935; }
 .mini-card.black { color:#000; }
 .community { display:flex; gap:clamp(6px,1vh,14px); margin:1.8vh 0; justify-content:center; }
-.card { width:clamp(40px,7.6vh,92px); height:clamp(56px,10.6vh,130px); background:#F5F5F0; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:clamp(18px,3.4vh,42px); font-weight:bold; }
+.card { width:clamp(40px,7.6vh,92px); height:clamp(56px,10.6vh,130px); background:#F5F5F0; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:clamp(18px,3.4vh,42px); font-weight:bold; box-shadow:0 4px 14px rgba(0,0,0,.35); }
 .card.red { color:#E53935; }
 .card.black { color:#000; }
-.card.back { background:linear-gradient(135deg,#1a1a3e,#3a3a6e); color:#555; }
-.pot { text-align:center; font-size:clamp(18px,2.8vh,36px); color:#FFD700; margin:0.9vh 0; }
-.bottom-bar { display:flex; justify-content:center; gap:2vw; padding:1.1vh 1.5vw; background:#2a2a4a; }
-.bottom-bar button { background:#333; color:#fff; border:none; padding:0.8vh 1.5vw; border-radius:6px; cursor:pointer; font-size:clamp(12px,1.6vh,20px); }
+.card.back { background:linear-gradient(135deg,#14141f,#262013); border:1px solid rgba(201,162,39,.35); color:#555; box-shadow:none; }
+.pot { text-align:center; font-size:clamp(18px,2.8vh,36px); color:var(--gold); font-weight:800; margin:0.9vh 0; }
+.bottom-bar { display:flex; justify-content:center; gap:2vw; padding:1.1vh 1.5vw; background:rgba(255,255,255,.03); border-top:1px solid rgba(255,255,255,.06); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+.bottom-bar button { background:rgba(255,255,255,.04); color:var(--gold); border:1px solid var(--line); padding:0.8vh 1.5vw; border-radius:10px; cursor:pointer; font-size:clamp(12px,1.6vh,20px); font-family:inherit; }
 .bottom-bar .history { flex:1; min-width:0; text-align:left; align-self:center; }
-.bottom-bar .history .h-entry { color:#aaa; font-size:clamp(10px,1.4vh,17px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bottom-bar .history .h-entry { color:var(--dim); font-size:clamp(10px,1.4vh,17px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .bottom-bar #statusText { font-size:clamp(11px,1.5vh,18px); }
-.connect-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
-.connect-screen input { font-size:24px; padding:12px; text-align:center; width:200px; background:#2a2a4a; color:#FFD700; border:2px solid #FFD700; border-radius:8px; letter-spacing:4px; }
-.connect-screen button { margin-top:20px; font-size:20px; padding:12px 40px; background:#4CAF50; color:#fff; border:none; border-radius:8px; cursor:pointer; }
-@keyframes pulse { 0%,100%{border-color:#E53935;} 50%{border-color:#FF6666;} }
-/* 赢家横幅（细节对齐 tv-display WinnerBanner，样式保持本页） */
-.winner-banner { position:fixed; top:5.2vh; left:50%; transform:translateX(-50%); z-index:50; background:#2a2a4a; border:2px solid #FFD700; border-radius:8px; padding:1.1vh 2.5vw; color:#FFD700; font-size:clamp(16px,2.8vh,34px); font-weight:bold; white-space:nowrap; animation:bannerDrop .3s ease-out; }
+.connect-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; height:100dvh; padding-top:var(--navH); }
+.cs-logo { width:clamp(72px,12vh,120px); height:clamp(72px,12vh,120px); filter:drop-shadow(0 12px 32px rgba(255,215,0,.3)); }
+.cs-title { margin-top:2vh; margin-bottom:4vh; font-size:clamp(28px,5.5vh,54px); font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,#FFE87C,#FFD700 45%,#c9a227); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.cs-sub { color:var(--dim); margin-bottom:2.5vh; font-size:clamp(13px,1.9vh,20px); }
+.cs-hint { color:#55555f; margin-top:3vh; font-size:clamp(11px,1.6vh,16px); }
+.connect-screen input { font-size:24px; padding:12px; text-align:center; width:200px; background:rgba(255,255,255,.05); color:var(--gold); border:1px solid var(--gold2); border-radius:12px; letter-spacing:4px; font-family:inherit; outline:none; }
+.connect-screen button { margin-top:20px; font-size:20px; font-weight:700; padding:12px 40px; background:linear-gradient(135deg,#FFD700,#c9a227); color:#1a1400; border:none; border-radius:12px; cursor:pointer; box-shadow:0 8px 28px rgba(255,215,0,.25); font-family:inherit; }
+@keyframes pulse { 0%,100%{border-color:var(--gold);} 50%{border-color:#FFE87C;} }
+/* 赢家横幅（细节对齐 tv-display WinnerBanner，样式对齐首页） */
+.winner-banner { position:fixed; top:calc(var(--navH) + 1vh); left:50%; transform:translateX(-50%); z-index:50; background:rgba(7,7,12,.85); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid var(--gold); border-radius:12px; padding:1.1vh 2.5vw; color:var(--gold); font-size:clamp(16px,2.8vh,34px); font-weight:bold; white-space:nowrap; box-shadow:0 12px 36px rgba(255,215,0,.2); animation:bannerDrop .3s ease-out; }
 @keyframes bannerDrop { from { transform:translate(-50%,-100%); opacity:0; } to { transform:translate(-50%,0); opacity:1; } }
-/* 实时排行（细节对齐 tv-display LeaderboardPanel，样式保持本页） */
-.leaderboard { position:absolute; right:1vw; top:50%; transform:translateY(-50%); background:#2a2a4a; border:2px solid #333; border-radius:8px; padding:1.2vh 1vw; min-width:clamp(140px,13vw,280px); z-index:5; }
-.leaderboard h4 { color:#FFD700; font-size:clamp(12px,2vh,24px); margin-bottom:0.6vh; text-align:center; }
+/* 实时排行（细节对齐 tv-display LeaderboardPanel，样式对齐首页毛玻璃面板） */
+.leaderboard { position:absolute; right:1vw; top:50%; transform:translateY(-50%); background:var(--panel); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border:1px solid var(--line); border-radius:14px; padding:1.2vh 1vw; min-width:clamp(140px,13vw,280px); z-index:5; }
+.leaderboard h4 { color:var(--gold); font-size:clamp(12px,2vh,24px); margin-bottom:0.6vh; text-align:center; }
 .lb-row { display:flex; justify-content:space-between; gap:1vw; font-size:clamp(10px,1.6vh,20px); padding:0.4vh 0; }
-.lb-row.leader { color:#FFD700; font-weight:bold; }
-.lb-row.out { color:#666; }
+.lb-row.leader { color:var(--gold); font-weight:bold; }
+.lb-row.out { color:#55555f; }
 /* 扫码支付开桌（与 leaderboard 同族面板，仅空闲态显示，支付成功赛事激活后自动隐藏） */
-.qr-panel { position:absolute; left:1vw; top:50%; transform:translateY(-50%); background:#2a2a4a; border:2px solid #333; border-radius:8px; padding:1.4vh 1vw; z-index:5; text-align:center; }
-.qr-panel h4 { color:#FFD700; font-size:clamp(12px,2vh,24px); margin-bottom:1vh; }
+.qr-panel { position:absolute; left:1vw; top:50%; transform:translateY(-50%); background:var(--panel); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border:1px solid var(--line); border-radius:14px; padding:1.4vh 1vw; z-index:5; text-align:center; }
+.qr-panel h4 { color:var(--gold); font-size:clamp(12px,2vh,24px); margin-bottom:1vh; }
 .qr-panel .qr-box { background:#F5F5F0; border-radius:8px; padding:0.9vh; display:inline-block; line-height:0; }
 .qr-panel .qr-box img, .qr-panel .qr-box canvas { display:block; }
-.qr-panel .qr-price { color:#FFD700; font-size:clamp(14px,2.4vh,30px); font-weight:bold; margin-top:1vh; min-height:1em; }
-.qr-panel .qr-hint { color:#aaa; font-size:clamp(10px,1.5vh,19px); margin-top:0.4vh; }
+.qr-panel .qr-price { color:var(--gold); font-size:clamp(14px,2.4vh,30px); font-weight:bold; margin-top:1vh; min-height:1em; }
+.qr-panel .qr-hint { color:var(--dim); font-size:clamp(10px,1.5vh,19px); margin-top:0.4vh; }
 /* APP 下载二维码（常驻右下角，与 leaderboard/qr-panel 同族面板，低调不抢牌桌） */
-.app-dl { position:absolute; right:1vw; bottom:1.5vh; background:#2a2a4a; border:2px solid #333; border-radius:8px; padding:1vh 0.8vw; z-index:5; text-align:center; opacity:.85; }
+.app-dl { position:absolute; right:1vw; bottom:1.5vh; background:var(--panel); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border:1px solid var(--line); border-radius:14px; padding:1vh 0.8vw; z-index:5; text-align:center; opacity:.85; }
 .app-dl .dl-box { background:#F5F5F0; border-radius:6px; padding:0.6vh; display:inline-block; line-height:0; }
 .app-dl .dl-box img, .app-dl .dl-box canvas { display:block; }
-.app-dl .dl-cap { color:#aaa; font-size:clamp(10px,1.4vh,17px); margin-top:0.5vh; }
+.app-dl .dl-cap { color:var(--dim); font-size:clamp(10px,1.4vh,17px); margin-top:0.5vh; }
 /* 赛事结束排名浮层 */
-.finished-mask { position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:60; }
-.finished-box { background:#2a2a4a; border:2px solid #FFD700; border-radius:12px; padding:3vh 3vw; min-width:clamp(300px,26vw,560px); }
-.finished-box h2 { color:#FFD700; text-align:center; margin-bottom:1.2vh; font-size:clamp(20px,3.4vh,40px); }
+.finished-mask { position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:200; }
+.finished-box { background:rgba(12,12,18,.92); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid var(--gold); border-radius:20px; padding:3vh 3vw; min-width:clamp(300px,26vw,560px); box-shadow:0 20px 60px rgba(0,0,0,.5); }
+.finished-box h2 { color:var(--gold); text-align:center; margin-bottom:1.2vh; font-size:clamp(20px,3.4vh,40px); }
 .fr-row { display:flex; justify-content:space-between; gap:2vw; padding:0.5vh 0; font-size:clamp(14px,2.2vh,28px); }
-.fr-row.first { color:#FFD700; font-weight:bold; }
-.finished-hint { color:#666; font-size:clamp(10px,1.4vh,16px); text-align:center; margin-top:1.2vh; }
-@media (max-width:900px) and (orientation:portrait) { .leaderboard, .qr-panel, .app-dl { display:none; } }
+.fr-row.first { color:var(--gold); font-weight:bold; }
+.finished-hint { color:#55555f; font-size:clamp(10px,1.4vh,16px); text-align:center; margin-top:1.2vh; }
+@media (max-width:900px) and (orientation:portrait) { .leaderboard, .qr-panel, .app-dl { display:none; } .nav-links { display:none; } }
 /* 矮视口（手机横屏）紧凑化，风格不变 */
 @media (max-height:500px) {
+  :root { --navH:34px; }
+  .nav-links { display:none; }
   .app-dl { display:none; }
   .top-bar { padding:8px 20px; font-size:15px; }
   .community { margin:8px 0; }
@@ -89,6 +113,19 @@ body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; heig
 </style>
 </head>
 <body>
+<div class="glow glow-a"></div><div class="glow glow-b"></div><div class="glow glow-c"></div>
+<nav><div class="nav-in">
+  <img src="/assets/logo.svg" alt="天天扑克锦标赛 Logo">
+  <div class="nav-name">天天扑克锦标赛<span>TIANTIAN POKER</span></div>
+  <div class="nav-links">
+    <a href="/">首页</a>
+    <a href="/player.html">网页对战</a>
+    <a href="/tv.html">开房间</a>
+    <a href="/agent/">Agent 参赛</a>
+    <a href="/merchant/login.html">商户后台</a>
+    <a class="nav-cta" href="/player.html">立即参赛</a>
+  </div>
+</div></nav>
 <div id="app"></div>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="/assets/qrcode.min.js"></script>
@@ -142,11 +179,11 @@ function addHistory(text, playerId) {
 function renderConnect() {
   document.getElementById('app').innerHTML = `
     <div class="connect-screen">
-      <h1 style="color:#FFD700;font-size:48px;margin-bottom:40px;">🃏 天天扑克锦标赛</h1>
-      <p style="color:#aaa;margin-bottom:20px;">输入桌号连接牌桌</p>
+      <img src="/assets/logo.svg" class="cs-logo" alt="Logo"><h1 class="cs-title">天天扑克锦标赛</h1>
+      <p class="cs-sub">输入桌号连接牌桌</p>
       <input id="codeInput" maxlength="6" placeholder="SNGT01" value="" />
       <button onclick="connect()">连接</button>
-      <p style="color:#666;margin-top:30px;font-size:14px;">一般无需输入：TV 首次启动自动开桌；此处仅用于切换到指定桌号</p>
+      <p class="cs-hint">一般无需输入：TV 首次启动自动开桌；此处仅用于切换到指定桌号</p>
     </div>
   `;
   document.getElementById('codeInput').focus();
@@ -175,7 +212,7 @@ function connect(code) {
     if (el) { el.textContent = '连接失败: ' + err.message; el.style.color = '#E53935'; }
   });
   socket.on('disconnect', () => {
-    document.getElementById('app').innerHTML = '<div class="connect-screen"><h1 style="color:#E53935;">已断线，重连中...</h1></div>';
+    document.getElementById('app').innerHTML = '<div class="connect-screen"><h1 style="color:#ff5252;">已断线，重连中...</h1></div>';
   });
 
   // 看门狗：连上后 8 秒仍收不到 table_state（桌号已失效/不存在），清记忆重新自动开桌
@@ -388,7 +425,7 @@ function renderTable() {
       </div>
       <div class="bottom-bar">
         <div class="history" id="history"></div>
-        <span id="statusText" style="color:#aaa;align-self:center;">等待连接...</span>
+        <span id="statusText" style="color:#9c9ca8;align-self:center;">等待连接...</span>
         <button onclick="location.reload()">断开</button>
       </div>
     </div>
@@ -439,7 +476,7 @@ function renderAppDl() {
   el.innerHTML = `<div class="dl-box" id="dlBox"></div><div class="dl-cap">扫码下载玩家APP</div>`;
   new QRCode(document.getElementById('dlBox'), {
     text: APP_DOWNLOAD_URL, width: size, height: size,
-    colorDark: '#1a1a2e', colorLight: '#F5F5F0',
+    colorDark: '#07070c', colorLight: '#F5F5F0',
     correctLevel: QRCode.CorrectLevel.M,
   });
   dlRendered = true;
@@ -460,7 +497,7 @@ function renderQR() {
       <div class="qr-hint">微信 / 支付宝 / USDT</div>`;
     new QRCode(document.getElementById('qrBox'), {
       text: payUrl, width: size, height: size,
-      colorDark: '#1a1a2e', colorLight: '#F5F5F0',
+      colorDark: '#07070c', colorLight: '#F5F5F0',
       correctLevel: QRCode.CorrectLevel.M,
     });
     qrRendered = true;
@@ -614,8 +651,8 @@ function renderFinished() {
 function autoProvision() {
   document.getElementById('app').innerHTML = `
     <div class="connect-screen">
-      <h1 style="color:#FFD700;font-size:48px;margin-bottom:40px;">🃏 天天扑克锦标赛</h1>
-      <p style="color:#aaa;">正在开启牌桌…</p>
+      <img src="/assets/logo.svg" class="cs-logo" alt="Logo"><h1 class="cs-title">天天扑克锦标赛</h1>
+      <p class="cs-sub">正在开启牌桌…</p>
     </div>`;
   fetch(`${SERVER}/api/v1/tables`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
     .then(r => { if (!r.ok) throw new Error('自动开桌失败 (' + r.status + ')'); return r.json(); })

@@ -85,6 +85,18 @@ data class Card(
     val value: Int = 0,
 )
 
+/** 牌面唯一键（rank + 规范化花色符号），对齐网页 cKey()，用于摊牌最佳 5 张判等 */
+fun Card.key(): String {
+    val s = when (suit.lowercase()) {
+        "spades", "spade", "♠" -> "♠"
+        "hearts", "heart", "♥" -> "♥"
+        "diamonds", "diamond", "♦" -> "♦"
+        "clubs", "club", "♣" -> "♣"
+        else -> suit
+    }
+    return rank + s
+}
+
 /** 每手结果（hand_result 事件），用于结果浮层；下一手开始清除 */
 data class HandResultInfo(
     val winnerId: String = "",
@@ -131,6 +143,12 @@ data class GameState(
     val myEliminatedRank: Int? = null,
     /** 赛事结束后的最终排名表（tournament_finished 下发），空 = 未结束 */
     val finalRankings: List<FinalRankInfo> = emptyList(),
+    /** 摊牌亮出的底牌：seatIndex → 底牌（showdown 的 allResults/winners），新一手清空 */
+    val showdownHands: Map<Int, List<Card>> = emptyMap(),
+    /** 赢家最佳 5 张牌（Card.key 判等），用于金色描边高亮 */
+    val winCards: Set<String> = emptySet(),
+    /** 赢家座位集合（showdown winners 解析） */
+    val winSeats: Set<Int> = emptySet(),
 )
 
 data class SeatInfo(
