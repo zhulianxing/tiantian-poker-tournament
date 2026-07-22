@@ -289,10 +289,15 @@ async function markOrderPaid(orderId) {
     client.release();
   }
 
-  // 触发赛事激活
+  // 触发赛事激活（HTTP 调 poker-socket:3001。严禁 require('../poker-socket')：
+  // 那会在 payment-svc 进程内另起一个监听 3011、零客户端的引擎，对局事件全部广播到空气）
   try {
-    const { activateTournament } = require('../poker-socket');
-    await activateTournament(order.tournament_id);
+    const r = await fetch('http://localhost:3001/internal/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tournamentId: order.tournament_id }),
+    });
+    if (!r.ok) throw new Error('activate http ' + r.status);
   } catch (e) {
     console.error('[Payment] Failed to activate tournament:', e.message);
   }
@@ -528,10 +533,8 @@ app.post('/api/v1/refund', auth, async (req, res) => {
         client.release();
       }
 
-      try {
-        const { io } = require('../poker-socket');
-        if (io) io.emit('order_refunded', { orderId, tournamentId: order.tournament_id });
-      } catch (e) { /* ignore */ }
+      // 原此处经 require('../poker-socket') 广播 order_refunded：无任何客户端消费该事件，
+      // 且 require 会在本进程误启引擎，已移除。
 
       res.json({ success: true, orderId, status: 'refunded' });
     } else {
