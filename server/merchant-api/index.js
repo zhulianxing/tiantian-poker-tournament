@@ -61,6 +61,42 @@ app.post('/api/v1/merchant/login', async (req, res) => {
 });
 
 // ============================================================
+// 绑定代理（仅未绑定时可绑，邀请码即 agents.code）
+// ============================================================
+app.post('/api/v1/merchant/bind-agent', merchantAuth, async (req, res) => {
+  const inviteCode = (req.body.inviteCode || '').trim();
+  if (!inviteCode) return res.status(400).json({ error: 'missing inviteCode' });
+
+  try {
+    const venueResult = await query(
+      'SELECT agent_id FROM venues WHERE id = $1', [req.merchant.venueId]
+    );
+    const venue = venueResult.rows[0];
+    if (!venue) return res.status(404).json({ error: 'venue not found' });
+
+    if (venue.agent_id) {
+      const currentResult = await query(
+        'SELECT name, code FROM agents WHERE id = $1', [venue.agent_id]
+      );
+      return res.status(409).json({ error: 'agent already bound', agent: currentResult.rows[0] || null });
+    }
+
+    const agentResult = await query(
+      `SELECT id, name, code FROM agents WHERE code = $1 AND status = 'active'`,
+      [inviteCode]
+    );
+    const agent = agentResult.rows[0];
+    if (!agent) return res.status(404).json({ error: 'invite code not found' });
+
+    await query('UPDATE venues SET agent_id = $1 WHERE id = $2', [agent.id, req.merchant.venueId]);
+
+    res.json({ ok: true, agent: { name: agent.name, code: agent.code } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
 // 数据看板
 // ============================================================
 app.get('/api/v1/dashboard/summary', merchantAuth, async (req, res) => {
@@ -128,6 +164,12 @@ app.get('/api/v1/dashboard/summary', merchantAuth, async (req, res) => {
       return (v >= 0 ? '+' : '') + v + '%';
     };
 
+    // 已绑定代理（venues.agent_id JOIN agents，未绑定为 null）
+    const boundAgentResult = await query(
+      `SELECT a.name, a.code FROM venues v JOIN agents a ON v.agent_id = a.id WHERE v.id = $1`,
+      [venueId]
+    );
+
     res.json({
       todayOrders: parseInt(o.today_orders),
       ordersChange: pct(o.today_orders, o.y_orders),
@@ -137,6 +179,7 @@ app.get('/api/v1/dashboard/summary', merchantAuth, async (req, res) => {
       weekMatches: parseInt(weekResult.rows[0].matches),
       weekTraffic: parseInt(weekResult.rows[0].traffic),
       onlineDevices: parseInt(deviceResult.rows[0].cnt),
+      boundAgent: boundAgentResult.rows[0] || null,
       chartData,
     });
   } catch (err) {

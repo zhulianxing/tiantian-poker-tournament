@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>天天扑克锦标赛 · 代理注册</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠️</text></svg>">
+</head>
+<body>
+
+<div class="login-wrapper">
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>♠️ 天天扑克锦标赛</h1>
+      <p>下级代理注册</p>
+    </div>
+    <div id="registerArea">
+      <form id="registerForm">
+        <div class="form-group">
+          <label>姓名</label>
+          <input type="text" id="name" placeholder="请输入姓名" required autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>手机号</label>
+          <input type="text" id="phone" placeholder="请输入手机号" required autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="password" placeholder="请输入密码" required>
+        </div>
+        <div class="form-group">
+          <label>邀请码</label>
+          <input type="text" id="inviteCode" placeholder="请输入上级代理邀请码" required autocomplete="off">
+        </div>
+        <button type="submit" class="btn btn-gold btn-block" id="registerBtn">注 册</button>
+      </form>
+      <div class="login-links">
+        已有账号？<a href="login.html">直接登录</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 支持 URL ?code=XXX 预填邀请码
+  const presetCode = new URLSearchParams(window.location.search).get('code');
+  if (presetCode) {
+    document.getElementById('inviteCode').value = presetCode.toUpperCase();
+  }
+
+  document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('registerBtn');
+    const name = document.getElementById('name').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const password = document.getElementById('password').value;
+    const inviteCode = document.getElementById('inviteCode').value.trim().toUpperCase();
+
+    if (!name || !phone || !password || !inviteCode) return;
+
+    btn.disabled = true;
+    btn.textContent = '注册中...';
+
+    try {
+      const res = await fetch('/agents/api/v1/agent/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone, password, inviteCode })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.ok) {
+        showSuccess(data.code);
+      } else {
+        showToast(data.message || data.error || '注册失败', 'error');
+        btn.disabled = false;
+        btn.textContent = '注 册';
+      }
+    } catch (err) {
+      showToast('网络错误，请稍后重试', 'error');
+      btn.disabled = false;
+      btn.textContent = '注 册';
+    }
+  });
+
+  function showSuccess(code) {
+    document.getElementById('registerArea').innerHTML = `
+      <div class="register-success">
+        <p style="color: var(--success); font-size: 15px;">注册成功，你的邀请码是</p>
+        <div class="success-code">${code}</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">
+          请妥善保存邀请码，可用于绑定门店和发展下级代理
+        </p>
+        <a class="btn btn-gold btn-block" href="login.html" style="display:block;">前往登录</a>
+      </div>
+    `;
+  }
+
+  function showToast(msg, type) {
+    const container = document.createElement('div');
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (type || '');
+    toast.textContent = msg;
+    container.appendChild(toast);
+    setTimeout(() => { toast.remove(); container.remove(); }, 3000);
+  }
+</script>
+
+</body>
+</html>

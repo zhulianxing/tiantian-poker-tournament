@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>天天扑克锦标赛 · 代理后台</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠️</text></svg>">
+</head>
+<body>
+
+<!-- Mobile toggle -->
+<button class="mobile-toggle" id="mobileToggle">☰</button>
+
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-icon">♠</div>
+      <span>天天扑克锦标赛</span>
+    </div>
+    <nav class="nav-menu" id="navMenu">
+      <div class="nav-item active" data-route="dashboard">
+        <span class="nav-icon">📊</span> 看板
+      </div>
+      <div class="nav-item" data-route="venues">
+        <span class="nav-icon">🏪</span> 我的门店
+      </div>
+      <div class="nav-item" data-route="subagents">
+        <span class="nav-icon">🤝</span> 我的代理
+      </div>
+      <div class="nav-item" data-route="orders">
+        <span class="nav-icon">📋</span> 订单
+      </div>
+      <div class="nav-item" data-route="withdrawals">
+        <span class="nav-icon">💰</span> 提现
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="merchant-info" id="agentInfo">--</div>
+      <button class="btn-logout" id="logoutBtn">退出登录</button>
+    </div>
+  </aside>
+
+  <!-- Main Area -->
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title" id="pageTitle">看板</div>
+      <div class="topbar-right">
+        <span id="currentTime"></span>
+      </div>
+    </header>
+    <div class="content-area" id="contentArea">
+      <!-- Content rendered by app.js -->
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

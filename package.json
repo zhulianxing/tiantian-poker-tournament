@@ -9,7 +9,8 @@
     "server/poker-socket",
     "server/poker-engine",
     "server/merchant-api",
-    "server/payment-svc"
+    "server/payment-svc",
+    "server/agent-api"
   ],
   "scripts": {
     "dev": "pm2 start ecosystem.config.js",

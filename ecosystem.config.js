@@ -74,5 +74,22 @@ module.exports = {
         JWT_SECRET: 'poker-night-secret-2026',
       },
     },
+    {
+      name: 'agent-api',
+      script: './server/agent-api/index.js',
+      instances: 1,
+      autorestart: true,
+      max_memory_restart: '150M',
+      env: {
+        NODE_ENV: 'production',
+        AGENT_PORT: 3004,
+        DB_HOST: '127.0.0.1',
+        DB_PORT: 5432,
+        DB_NAME: 'poker_night',
+        DB_USER: 'poker',
+        DB_PASSWORD: 'poker123',
+        JWT_SECRET: 'poker-night-secret-2026',
+      },
+    },
   ],
 };

@@ -73,7 +73,7 @@ app.post('/api/v1/payment/create', async (req, res) => {
   try {
     // 获取牌桌信息
     const tableResult = await query(
-      `SELECT t.*, v.name as venue_name, v.rate_plan
+      `SELECT t.*, v.name as venue_name, v.rate_plan, v.agent_id
        FROM tables t JOIN venues v ON t.venue_id = v.id
        WHERE t.id = $1`, [tableId]
     );
@@ -83,7 +83,38 @@ app.post('/api/v1/payment/create', async (req, res) => {
     const amount = table.launch_fee;
     const ratePlan = table.rate_plan || { platform: FEE_SPLIT.PLATFORM, venue: FEE_SPLIT.VENUE };
     const platformFee = Math.floor(amount * ratePlan.platform / 100);
-    const venueIncome = amount - platformFee;
+    const venueGross = amount - platformFee;
+
+    // 代理分润（两级：总代 → 代理，佣金从门店分成中扣除）
+    // 算例：amount=2500、rate_plan 30/70、A.rate=10、M.rate=10
+    //   → platform_fee=750, agent_income=250, master_agent_income=250, venue_income=1250
+    let agentId = null;
+    let masterAgentId = null;
+    let agentIncome = 0;
+    let masterAgentIncome = 0;
+    if (table.agent_id) {
+      const agentResult = await query(
+        `SELECT id, parent_id, rate FROM agents WHERE id = $1 AND status = 'active'`,
+        [table.agent_id]
+      );
+      const agent = agentResult.rows[0];
+      if (agent) {
+        agentId = agent.id;
+        agentIncome = Math.floor(amount * agent.rate / 100);
+        if (agent.parent_id) {
+          const masterResult = await query(
+            `SELECT id, rate FROM agents WHERE id = $1 AND status = 'active'`,
+            [agent.parent_id]
+          );
+          const master = masterResult.rows[0];
+          if (master) {
+            masterAgentId = master.id;
+            masterAgentIncome = Math.floor(amount * master.rate / 100);
+          }
+        }
+      }
+    }
+    const venueIncome = Math.max(venueGross - agentIncome - masterAgentIncome, 0);
 
     // 生成 display_code
     const displayCode = generateDisplayCode();
@@ -101,9 +132,11 @@ app.post('/api/v1/payment/create', async (req, res) => {
 
     // 创建订单
     const orderResult = await query(
-      `INSERT INTO orders (tournament_id, table_id, venue_id, amount, platform_fee, venue_income, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending') RETURNING id`,
-      [tournamentId, tableId, table.venue_id, amount, platformFee, venueIncome]
+      `INSERT INTO orders (tournament_id, table_id, venue_id, amount, platform_fee, venue_income,
+        agent_id, master_agent_id, agent_income, master_agent_income, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending') RETURNING id`,
+      [tournamentId, tableId, table.venue_id, amount, platformFee, venueIncome,
+       agentId, masterAgentId, agentIncome, masterAgentIncome]
     );
     const orderId = orderResult.rows[0].id;
     const tradeOrderId = `PN-${orderId}-${Date.now()}`;

@@ -18,6 +18,7 @@
   let devicesData = [];
   let settlementsData = [];
   let refundsData = [];
+  let boundAgent = null;
 
   // ---- Init ----
   function init() {
@@ -198,6 +199,7 @@
           <div class="stat-sub" id="onlineDevicesSub">台</div>
         </div>
       </div>
+      <div id="agentCardWrap"></div>
       <div class="card">
         <div class="card-title">最近 7 天订单趋势</div>
         <div class="chart-container">
@@ -222,6 +224,7 @@
           document.getElementById('weekMatches').textContent = data.weekMatches ?? 0;
           document.getElementById('weekTraffic').textContent = data.weekTraffic ?? 0;
           document.getElementById('onlineDevices').textContent = data.onlineDevices ?? 0;
+          boundAgent = data.boundAgent || null;
         }
         drawChart(data && data.chartData ? data.chartData : getDemoChartData());
       } catch (err) {
@@ -229,6 +232,76 @@
         fillDashboardDemo();
         drawChart(getDemoChartData());
       }
+    }
+    renderAgentCard();
+  }
+
+  // ---- 绑定代理卡片 ----
+  function renderAgentCard() {
+    const wrap = document.getElementById('agentCardWrap');
+    if (!wrap) return;
+
+    if (boundAgent) {
+      wrap.innerHTML = `
+        <div class="card">
+          <div class="card-title"><span>绑定代理</span></div>
+          <div class="agent-bound">
+            <span class="agent-bound-name">${boundAgent.name}</span>
+            <span class="agent-bound-code">邀请码：${boundAgent.code}</span>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    wrap.innerHTML = `
+      <div class="card">
+        <div class="card-title"><span>绑定代理</span></div>
+        <div class="agent-bind-row">
+          <div class="form-group">
+            <label>代理邀请码</label>
+            <input type="text" id="agentInviteCode" placeholder="请输入代理邀请码">
+          </div>
+          <button class="btn btn-gold btn-sm" id="bindAgentBtn">绑定</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('bindAgentBtn').addEventListener('click', bindAgent);
+  }
+
+  async function bindAgent() {
+    const inviteCode = (document.getElementById('agentInviteCode').value || '').trim();
+    if (!inviteCode) {
+      showToast('请输入邀请码', 'error');
+      return;
+    }
+
+    if (IS_DEMO) {
+      boundAgent = { name: 'Demo代理', code: inviteCode };
+      renderAgentCard();
+      showToast('代理绑定成功', 'success');
+      return;
+    }
+
+    try {
+      const data = await api('/merchant/bind-agent', {
+        method: 'POST',
+        body: JSON.stringify({ inviteCode })
+      });
+      if (data && data.ok) {
+        boundAgent = data.agent;
+        renderAgentCard();
+        showToast('代理绑定成功', 'success');
+      } else if (data && data.agent) {
+        // 已绑定过（409），展示当前代理
+        boundAgent = data.agent;
+        renderAgentCard();
+        showToast('已绑定代理：' + data.agent.name, 'error');
+      } else {
+        showToast((data && data.error) || '绑定失败', 'error');
+      }
+    } catch (err) {
+      showToast('网络错误', 'error');
     }
   }
 
