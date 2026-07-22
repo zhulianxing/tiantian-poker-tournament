@@ -103,10 +103,12 @@ async function loadTableInfo() {
     document.getElementById('amountSection').style.display = 'block';
     document.getElementById('payMethods').style.display = 'flex';
 
-    document.getElementById('tableName').textContent = data.name || data.tableName || tableCode;
+    document.getElementById('tableName').textContent = data.name || data.label || data.tableName || tableCode;
     document.getElementById('displayCode').textContent = data.display_code || data.displayCode || '—';
 
+    // launch_fee 单位是分，需换算成元
     var fee = data.entryFee || data.entry_fee || data.fee;
+    if (fee == null && data.launch_fee != null) fee = data.launch_fee / 100;
     if (fee != null) {
       document.getElementById('amount').textContent = '¥ ' + Number(fee).toFixed(2);
     } else {
