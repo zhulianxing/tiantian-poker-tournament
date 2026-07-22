@@ -53,6 +53,13 @@ body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; heig
 .lb-row { display:flex; justify-content:space-between; gap:1vw; font-size:clamp(10px,1.6vh,20px); padding:0.4vh 0; }
 .lb-row.leader { color:#FFD700; font-weight:bold; }
 .lb-row.out { color:#666; }
+/* 扫码支付开桌（与 leaderboard 同族面板，仅空闲态显示，支付成功赛事激活后自动隐藏） */
+.qr-panel { position:absolute; left:1vw; top:50%; transform:translateY(-50%); background:#2a2a4a; border:2px solid #333; border-radius:8px; padding:1.4vh 1vw; z-index:5; text-align:center; }
+.qr-panel h4 { color:#FFD700; font-size:clamp(12px,2vh,24px); margin-bottom:1vh; }
+.qr-panel .qr-box { background:#F5F5F0; border-radius:8px; padding:0.9vh; display:inline-block; line-height:0; }
+.qr-panel .qr-box img, .qr-panel .qr-box canvas { display:block; }
+.qr-panel .qr-price { color:#FFD700; font-size:clamp(14px,2.4vh,30px); font-weight:bold; margin-top:1vh; min-height:1em; }
+.qr-panel .qr-hint { color:#aaa; font-size:clamp(10px,1.5vh,19px); margin-top:0.4vh; }
 /* 赛事结束排名浮层 */
 .finished-mask { position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:60; }
 .finished-box { background:#2a2a4a; border:2px solid #FFD700; border-radius:12px; padding:3vh 3vw; min-width:clamp(300px,26vw,560px); }
@@ -60,7 +67,7 @@ body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; heig
 .fr-row { display:flex; justify-content:space-between; gap:2vw; padding:0.5vh 0; font-size:clamp(14px,2.2vh,28px); }
 .fr-row.first { color:#FFD700; font-weight:bold; }
 .finished-hint { color:#666; font-size:clamp(10px,1.4vh,16px); text-align:center; margin-top:1.2vh; }
-@media (max-width:900px) and (orientation:portrait) { .leaderboard { display:none; } }
+@media (max-width:900px) and (orientation:portrait) { .leaderboard, .qr-panel { display:none; } }
 /* 矮视口（手机横屏）紧凑化，风格不变 */
 @media (max-height:500px) {
   .top-bar { padding:8px 20px; font-size:15px; }
@@ -78,6 +85,7 @@ body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; heig
 <body>
 <div id="app"></div>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="/assets/qrcode.min.js"></script>
 <script>
 const SERVER = window.location.origin;
 let socket = null;
@@ -92,8 +100,11 @@ const S = {
   winnerBanner: null,      // {winnerName, winAmount, handName}
   showdownHands: {},       // seatIndex → [card, card]
   rankings: [], finished: false,
+  launchFee: null,         // 开桌费用（分），来自 /api/v1/tables/:code
+  tournamentId: '',        // 当前赛事 id（用于 tournament_cancelled 过滤本桌）
 };
 let finishedTimer = null;
+let qrRendered = false;    // 二维码只生成一次，之后按阶段显隐
 
 // ============ 工具（与 App 同规则） ============
 function fmt(n) { n = Math.floor(n || 0); if (n >= 1e6) return Math.floor(n/1e6)+'M'; if (n >= 1e3) return Math.floor(n/1e3)+'K'; return String(n); }
@@ -147,6 +158,7 @@ function connect() {
   socket.on('connect', () => {
     socket.emit('join_table', tableCode);
     if (!document.getElementById('seatsTop')) renderTable();
+    fetchTableInfo();
     renderAll();
   });
   socket.on('connect_error', (err) => {
@@ -171,6 +183,7 @@ function connect() {
     if (d.handNumber != null) S.handNumber = d.handNumber;
     if (d.stage != null) S.stage = d.stage;
     if (d.countdown != null) S.countdown = d.countdown;
+    if (d.tournamentId) S.tournamentId = d.tournamentId;
     if (d.phase) {
       S.phase = String(d.phase).toLowerCase();
       S.statusText = S.phase === 'started' ? '比赛进行中' : S.phase === 'registering' ? '报名中，等待开赛...' : '等待赛事开始';
@@ -195,6 +208,12 @@ function connect() {
     renderAll();
   });
   socket.on('tournament_activated', (d) => { S.phase = 'registering'; S.statusText = '等待玩家入座...'; renderAll(); });
+  socket.on('tournament_cancelled', (d) => {
+    // 支付超时/人数不足被取消 → 回空闲态，重新显示扫码开桌（多桌场景下只响应本桌赛事）
+    if (S.tournamentId && d && d.tournamentId && d.tournamentId !== S.tournamentId) return;
+    Object.assign(S, { phase: 'idle', tournamentId: '', seats: [], pot: 0, communityCards: [], stage: '', handNumber: 0, countdown: 0, statusText: '等待赛事开始' });
+    renderAll();
+  });
   socket.on('countdown_tick', (d) => { S.countdown = d.remaining ?? 0; renderAll(); });
   socket.on('tournament_started', (d) => {
     if (d.seats) S.seats = d.seats;
@@ -347,6 +366,7 @@ function renderTable() {
           <div class="seats-bottom" id="seatsBottom"></div>
         </div>
         <div class="leaderboard" id="leaderboard"></div>
+        <div class="qr-panel" id="qrPanel" style="display:none"></div>
       </div>
       <div class="bottom-bar">
         <div class="history" id="history"></div>
@@ -374,7 +394,46 @@ function renderAll() {
   renderBottom();
   renderBanner();
   renderLeaderboard();
+  renderQR();
   renderFinished();
+}
+
+// 拉取开桌费用（payment 流程与 /pay/pay.html 同一数据源）
+function fetchTableInfo() {
+  fetch(`${SERVER}/api/v1/tables/${encodeURIComponent(tableCode)}`)
+    .then(r => (r.ok ? r.json() : null))
+    .then(d => {
+      if (!d) return;
+      S.launchFee = d.launch_fee ?? null;
+      renderQR();
+    })
+    .catch(() => {});
+}
+
+// 扫码支付开桌：仅空闲态（无报名/进行中赛事）显示；支付成功→tournament_activated→自动隐藏
+function renderQR() {
+  const el = document.getElementById('qrPanel');
+  if (!el) return;
+  const busy = S.phase === 'registering' || S.phase === 'started' || S.finished;
+  if (busy || !tableCode || typeof QRCode === 'undefined') { el.style.display = 'none'; return; }
+  if (!qrRendered) {
+    const payUrl = `${SERVER}/pay/pay.html?table=${encodeURIComponent(tableCode)}`;
+    const size = Math.max(96, Math.round(window.innerHeight * 0.16));
+    el.innerHTML = `<h4>扫码开启牌桌</h4>
+      <div class="qr-box" id="qrBox"></div>
+      <div class="qr-price">${S.launchFee != null ? '¥ ' + (S.launchFee / 100).toFixed(2) : ''}</div>
+      <div class="qr-hint">微信 / 支付宝 / USDT</div>`;
+    new QRCode(document.getElementById('qrBox'), {
+      text: payUrl, width: size, height: size,
+      colorDark: '#1a1a2e', colorLight: '#F5F5F0',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+    qrRendered = true;
+  } else if (S.launchFee != null) {
+    const p = el.querySelector('.qr-price');
+    if (p && !p.textContent) p.textContent = '¥ ' + (S.launchFee / 100).toFixed(2);
+  }
+  el.style.display = '';
 }
 
 function renderTopBar() {
