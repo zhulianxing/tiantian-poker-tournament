@@ -60,6 +60,11 @@ body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; heig
 .qr-panel .qr-box img, .qr-panel .qr-box canvas { display:block; }
 .qr-panel .qr-price { color:#FFD700; font-size:clamp(14px,2.4vh,30px); font-weight:bold; margin-top:1vh; min-height:1em; }
 .qr-panel .qr-hint { color:#aaa; font-size:clamp(10px,1.5vh,19px); margin-top:0.4vh; }
+/* APP 下载二维码（常驻右下角，与 leaderboard/qr-panel 同族面板，低调不抢牌桌） */
+.app-dl { position:absolute; right:1vw; bottom:1.5vh; background:#2a2a4a; border:2px solid #333; border-radius:8px; padding:1vh 0.8vw; z-index:5; text-align:center; opacity:.85; }
+.app-dl .dl-box { background:#F5F5F0; border-radius:6px; padding:0.6vh; display:inline-block; line-height:0; }
+.app-dl .dl-box img, .app-dl .dl-box canvas { display:block; }
+.app-dl .dl-cap { color:#aaa; font-size:clamp(10px,1.4vh,17px); margin-top:0.5vh; }
 /* 赛事结束排名浮层 */
 .finished-mask { position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:60; }
 .finished-box { background:#2a2a4a; border:2px solid #FFD700; border-radius:12px; padding:3vh 3vw; min-width:clamp(300px,26vw,560px); }
@@ -67,9 +72,10 @@ body { background:#1A1A2E; color:#fff; font-family:'Courier New',monospace; heig
 .fr-row { display:flex; justify-content:space-between; gap:2vw; padding:0.5vh 0; font-size:clamp(14px,2.2vh,28px); }
 .fr-row.first { color:#FFD700; font-weight:bold; }
 .finished-hint { color:#666; font-size:clamp(10px,1.4vh,16px); text-align:center; margin-top:1.2vh; }
-@media (max-width:900px) and (orientation:portrait) { .leaderboard, .qr-panel { display:none; } }
+@media (max-width:900px) and (orientation:portrait) { .leaderboard, .qr-panel, .app-dl { display:none; } }
 /* 矮视口（手机横屏）紧凑化，风格不变 */
 @media (max-height:500px) {
+  .app-dl { display:none; }
   .top-bar { padding:8px 20px; font-size:15px; }
   .community { margin:8px 0; }
   .card { width:44px; height:62px; font-size:20px; }
@@ -378,6 +384,7 @@ function renderTable() {
         </div>
         <div class="leaderboard" id="leaderboard"></div>
         <div class="qr-panel" id="qrPanel" style="display:none"></div>
+        <div class="app-dl" id="appDl"></div>
       </div>
       <div class="bottom-bar">
         <div class="history" id="history"></div>
@@ -406,6 +413,7 @@ function renderAll() {
   renderBanner();
   renderLeaderboard();
   renderQR();
+  renderAppDl();
   renderFinished();
 }
 
@@ -419,6 +427,22 @@ function fetchTableInfo() {
       renderQR();
     })
     .catch(() => {});
+}
+
+// APP 下载二维码（常驻右下角）：链接玩家端 APK，扫码即下
+const APP_DOWNLOAD_URL = 'https://ttpoker.xyz/download/player-app-v1.1.1.apk';
+let dlRendered = false;
+function renderAppDl() {
+  const el = document.getElementById('appDl');
+  if (!el || dlRendered || typeof QRCode === 'undefined') return;
+  const size = Math.max(64, Math.round(window.innerHeight * 0.10));
+  el.innerHTML = `<div class="dl-box" id="dlBox"></div><div class="dl-cap">扫码下载玩家APP</div>`;
+  new QRCode(document.getElementById('dlBox'), {
+    text: APP_DOWNLOAD_URL, width: size, height: size,
+    colorDark: '#1a1a2e', colorLight: '#F5F5F0',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+  dlRendered = true;
 }
 
 // 扫码支付开桌：仅空闲态（无报名/进行中赛事）显示；支付成功→tournament_activated→自动隐藏
