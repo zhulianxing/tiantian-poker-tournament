@@ -92,7 +92,7 @@ app.post('/api/v1/agent/register', async (req, res) => {
       try {
         await query(
           `INSERT INTO agents (code, parent_id, name, phone, password_hash, rate)
-           VALUES ($1, $2, $3, $4, $5, 10)`,
+           VALUES ($1, $2, $3, $4, $5, 20)`,
           [candidate, parent.id, name, phone, passwordHash]
         );
         code = candidate;

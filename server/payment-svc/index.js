@@ -7,6 +7,7 @@ const cors = require('cors');
 const axios = require('axios');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { query, db } = require('@poker-night/shared');
 const { ORDER_STATUS, FEE_SPLIT } = require('@poker-night/shared');
 
@@ -23,6 +24,10 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://pokernight.cc';
 // USDT 通道配置（币安 BSC 自动收款网关）
 const CLAWPAY_API = process.env.CLAWPAY_API || 'https://pay.clawclaw.tech/api/index.php';
 const USDT_CNY_RATE = parseFloat(process.env.USDT_CNY_RATE || '7.2'); // 人民币兑美元汇率
+
+// 代理付费注册：299 元 或 50 USDT（固定价，不走汇率换算），全额归平台，不产生代理分润
+const AGENT_SIGNUP_FEE = 29900;   // 分
+const AGENT_SIGNUP_USDT = 50.00;
 
 app.use(cors());
 app.use(express.json());
@@ -86,8 +91,9 @@ app.post('/api/v1/payment/create', async (req, res) => {
     const venueGross = amount - platformFee;
 
     // 代理分润（两级：总代 → 代理，佣金从门店分成中扣除）
-    // 算例：amount=2500、rate_plan 30/70、A.rate=10、M.rate=10
-    //   → platform_fee=750, agent_income=250, master_agent_income=250, venue_income=1250
+    // 分配比：平台 30% / 门店 30% / 代理 20% / 总代 20%
+    // 算例：amount=2500、rate_plan 30/70、A.rate=20、M.rate=20
+    //   → platform_fee=750, agent_income=500, master_agent_income=500, venue_income=750
     let agentId = null;
     let masterAgentId = null;
     let agentIncome = 0;
@@ -255,6 +261,140 @@ app.post('/api/v1/payment/create', async (req, res) => {
 });
 
 // ============================================================
+// 代理付费注册（创建 agent_signup 订单，支付成功后开通代理账号）
+// ============================================================
+app.post('/api/v1/payment/agent-signup', async (req, res) => {
+  const { name, phone, password, inviteCode, paymentMethod } = req.body;
+  if (!name || !phone || !password) return res.status(400).json({ error: 'missing fields' });
+  if (!['wechat', 'alipay', 'usdt'].includes(paymentMethod)) {
+    return res.status(400).json({ error: 'invalid paymentMethod' });
+  }
+
+  try {
+    // 手机号唯一（任何状态都占用）
+    const exist = await query('SELECT id FROM agents WHERE phone = $1', [String(phone).trim()]);
+    if (exist.rows.length > 0) return res.status(409).json({ error: 'phone already registered' });
+
+    // 邀请码选填：有 → 挂靠为该代理下级；无 → 总代
+    let parentId = null;
+    if (inviteCode) {
+      const parentResult = await query(
+        `SELECT id FROM agents WHERE code = $1 AND status = 'active'`,
+        [String(inviteCode).toUpperCase().trim()]
+      );
+      const parent = parentResult.rows[0];
+      if (!parent) return res.status(400).json({ error: 'invalid invite code' });
+      parentId = parent.id;
+    }
+
+    const amount = AGENT_SIGNUP_FEE;
+    const signupPayload = {
+      name: String(name).trim(),
+      phone: String(phone).trim(),
+      passwordHash: bcrypt.hashSync(password, 10),
+      parentId,
+    };
+
+    const orderResult = await query(
+      `INSERT INTO orders (tournament_id, table_id, venue_id, amount, platform_fee, venue_income,
+        agent_id, master_agent_id, agent_income, master_agent_income, status, order_type, signup_payload)
+       VALUES (NULL, NULL, NULL, $1, $1, 0, NULL, NULL, 0, 0, 'pending', 'agent_signup', $2) RETURNING id`,
+      [amount, JSON.stringify(signupPayload)]
+    );
+    const orderId = orderResult.rows[0].id;
+    const tradeOrderId = `PN-${orderId}-${Date.now()}`;
+
+    // ==================== USDT 通道（固定 50 USDT） ====================
+    if (paymentMethod === 'usdt') {
+      const callbackUrl = `${PUBLIC_BASE_URL}/pay/api/v1/payment/usdt-notify`;
+
+      console.log('[Payment] Creating agent-signup USDT order:', tradeOrderId);
+
+      let clawData;
+      try {
+        const clawResult = await axios.post(
+          `${CLAWPAY_API}?action=create_order`,
+          {
+            amount: AGENT_SIGNUP_USDT,
+            order_no: tradeOrderId,
+            product_name: '天天扑克锦标赛 - 代理开通',
+            callback_url: callbackUrl,
+          },
+          { headers: { 'Content-Type': 'application/json' }, timeout: 15000 }
+        );
+        clawData = clawResult.data;
+      } catch (e) {
+        clawData = { code: -1, message: e.message };
+      }
+
+      if (clawData.code !== 0 || !clawData.data || !clawData.data.address) {
+        await query('UPDATE orders SET status = $1 WHERE id = $2', [ORDER_STATUS.CANCELLED, orderId]);
+        console.error('[Payment] ClawPay error (agent-signup):', clawData);
+        return res.status(500).json({ error: 'usdt payment creation failed', detail: clawData.message });
+      }
+
+      await query(
+        `UPDATE orders SET payment_method = 'usdt', xunhupay_order_id = $1,
+           usdt_order_id = $1, usdt_amount = $2, usdt_address = $3
+         WHERE id = $4`,
+        [tradeOrderId, AGENT_SIGNUP_USDT, clawData.data.address, orderId]
+      );
+
+      return res.json({
+        orderId,
+        amount,
+        paymentMethod: 'usdt',
+        usdtAmount: AGENT_SIGNUP_USDT,
+        usdtAddress: clawData.data.address,
+        expiresAt: clawData.data.expires_at,
+        payUrl: `${PUBLIC_BASE_URL}/pay/usdt-pay.html?order=${orderId}`,
+      });
+    }
+
+    // ==================== 虎皮椒通道（微信/支付宝） ====================
+    const notifyUrl = `${PUBLIC_BASE_URL}/pay/api/v1/payment/notify`;
+    const returnUrl = `${PUBLIC_BASE_URL}/pay/pay-result.html?order=${orderId}`;
+
+    const params = {
+      version: '1.1',
+      appid: XUNHU_APPID,
+      trade_order_id: tradeOrderId,
+      total_fee: (amount / 100).toFixed(2),
+      title: '天天扑克锦标赛 - 代理开通',
+      time: String(Math.floor(Date.now() / 1000)),
+      notify_url: notifyUrl,
+      return_url: returnUrl,
+      nonce: crypto.randomBytes(16).toString('hex'),
+      type: 'WAP',
+      wap_url: PUBLIC_BASE_URL,
+      wap_name: 'PokerNight',
+    };
+    params.hash = sign(params, XUNHU_APPKEY);
+
+    console.log('[Payment] Creating agent-signup xunhupay order:', tradeOrderId, 'amount:', params.total_fee);
+
+    const payResult = await axios.post(XUNHU_API, new URLSearchParams(params).toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 15000,
+    });
+    const payData = payResult.data;
+
+    if (payData.errcode !== 0 || !payData.url) {
+      await query('UPDATE orders SET status = $1 WHERE id = $2', [ORDER_STATUS.CANCELLED, orderId]);
+      console.error('[Payment] Xunhupay error (agent-signup):', payData);
+      return res.status(500).json({ error: 'payment creation failed', detail: payData.errmsg });
+    }
+
+    await query('UPDATE orders SET xunhupay_order_id = $1 WHERE id = $2', [tradeOrderId, orderId]);
+
+    res.json({ orderId, amount, payUrl: payData.url });
+  } catch (err) {
+    console.error('[Payment] Agent-signup error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
 // 订单确认支付（共用：虎皮椒回调 / USDT 回调 / USDT 轮询）
 // 返回 true 表示本次新确认，false 表示已处理过
 // ============================================================
@@ -276,10 +416,12 @@ async function markOrderPaid(orderId) {
 
     order = orderResult.rows[0];
 
-    await client.query(
-      'UPDATE tournaments SET status = $1 WHERE id = $2',
-      ['registering', order.tournament_id]
-    );
+    if (order.tournament_id) {
+      await client.query(
+        'UPDATE tournaments SET status = $1 WHERE id = $2',
+        ['registering', order.tournament_id]
+      );
+    }
 
     await client.query('COMMIT');
   } catch (err) {
@@ -287,6 +429,16 @@ async function markOrderPaid(orderId) {
     throw err;
   } finally {
     client.release();
+  }
+
+  // 代理注册单：到账后开通代理账号，不涉及赛事
+  if (order.order_type === 'agent_signup') {
+    try {
+      await activateAgentFromSignup(order);
+    } catch (e) {
+      console.error('[Payment] Failed to activate agent for order', orderId, e.message);
+    }
+    return true;
   }
 
   // 触发赛事激活（HTTP 调 poker-socket:3001。严禁 require('../poker-socket')：
@@ -303,6 +455,37 @@ async function markOrderPaid(orderId) {
   }
 
   return true;
+}
+
+// 代理注册到账 → 创建 active 代理（rate 20%，分配比：平台30/门店30/代理20/总代20）
+// 邀请码回写到订单 agent_code，支付结果页展示
+async function activateAgentFromSignup(order) {
+  const p = order.signup_payload || {};
+  if (!p.name || !p.phone || !p.passwordHash) throw new Error('bad signup_payload');
+  for (let i = 0; i < 5; i++) {
+    const code = generateDisplayCode(); // 6 位邀请码（与桌号同一字符集）
+    try {
+      await query(
+        `INSERT INTO agents (code, parent_id, name, phone, password_hash, rate, status)
+         VALUES ($1, $2, $3, $4, $5, 20, 'active')`,
+        [code, p.parentId || null, p.name, p.phone, p.passwordHash]
+      );
+      await query('UPDATE orders SET agent_code = $1 WHERE id = $2', [code, order.id]);
+      console.log('[Payment] Agent activated:', p.phone, 'code:', code);
+      return;
+    } catch (err) {
+      if (err.code === '23505') {
+        if (err.constraint && err.constraint.includes('phone')) {
+          // 支付后手机号被抢注：钱已收，人工处理（不改单状态）
+          console.error('[Payment] Agent phone already registered, manual handling:', p.phone);
+          return;
+        }
+        continue; // 邀请码冲突，换码重试
+      }
+      throw err;
+    }
+  }
+  throw new Error('failed to generate unique agent code');
 }
 
 // ============================================================
@@ -401,7 +584,7 @@ app.get('/api/v1/payment/usdt-status/:orderId', async (req, res) => {
   try {
     const result = await query(
       `SELECT o.id, o.status, o.amount, o.usdt_amount, o.usdt_address, o.usdt_order_id, o.created_at,
-              t.display_code
+              o.order_type, o.agent_code, t.display_code
        FROM orders o LEFT JOIN tournaments t ON o.tournament_id = t.id
        WHERE o.id = $1`,
       [req.params.orderId]
@@ -416,6 +599,8 @@ app.get('/api/v1/payment/usdt-status/:orderId', async (req, res) => {
       usdtAmount: order.usdt_amount ? parseFloat(order.usdt_amount) : null,
       usdtAddress: order.usdt_address,
       usdtOrderId: order.usdt_order_id,
+      orderType: order.order_type,
+      agentCode: order.agent_code || null,
       createdAt: order.created_at,
     });
   } catch (err) {

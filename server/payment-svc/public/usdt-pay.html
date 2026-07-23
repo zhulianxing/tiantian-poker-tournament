@@ -46,7 +46,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     <div id="main" style="display:none">
       <div class="amount-section">
         <div class="usdt-amount"><span id="usdtAmount">—</span> <small>USDT</small></div>
-        <div class="cny-amount">≈ ¥ <span id="cnyAmount">—</span>（赛事 <span id="displayCode">—</span>）</div>
+        <div class="cny-amount">≈ ¥ <span id="cnyAmount">—</span><span id="orderDesc">（赛事 <span id="displayCode">—</span>）</span></div>
       </div>
       <div class="network-warn">⚠️ 请仅通过 BSC（BEP-20）网络转入 USDT，其他链资产将无法找回</div>
       <div class="qr-section">
@@ -109,7 +109,7 @@ async function pollStatus() {
       clearInterval(pollTimer);
       clearInterval(expireTimer);
       box.className = 'status-section status-paid';
-      box.innerHTML = '✓ 支付成功！正在开局…';
+      box.innerHTML = o.orderType === 'agent_signup' ? '✓ 支付成功！代理已开通' : '✓ 支付成功！正在开局…';
       setTimeout(function(){
         window.location.href = '/pay/pay-result.html?order=' + encodeURIComponent(orderId);
       }, 1500);
@@ -134,7 +134,11 @@ async function loadOrder() {
     document.getElementById('main').style.display = 'block';
     document.getElementById('usdtAmount').textContent = o.usdtAmount;
     document.getElementById('cnyAmount').textContent = Number(o.amountCny).toFixed(2);
-    document.getElementById('displayCode').textContent = o.displayCode || '—';
+    if (o.orderType === 'agent_signup') {
+      document.getElementById('orderDesc').textContent = '（代理开通）';
+    } else {
+      document.getElementById('displayCode').textContent = o.displayCode || '—';
+    }
     document.getElementById('address').textContent = o.usdtAddress;
     document.getElementById('qrImg').src = '/pay/api/v1/payment/usdt-qr/' + encodeURIComponent(orderId) + '.png';
     addrText = o.usdtAddress;

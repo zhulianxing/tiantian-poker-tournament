@@ -118,11 +118,27 @@ async function checkOrder() {
     }
     var data = await resp.json();
     var status = data.status || data.orderStatus || '';
+    // 代理注册单：邀请码未回写说明开通中，按待处理继续轮询
+    if (data.order_type === 'agent_signup' && (status === 'paid') && !data.agent_code) {
+      status = 'pending';
+    }
     // 成功
     if (status === 'success' || status === 'paid' || status === 'completed' || status === 1 || status === '1') {
       document.getElementById('orderId').textContent = orderId;
-      document.getElementById('amount').textContent = data.amount != null ? '¥ ' + Number(data.amount).toFixed(2) : '¥ —';
-      document.getElementById('displayCode').textContent = data.display_code || data.displayCode || '—';
+      document.getElementById('amount').textContent = data.amount != null ? '¥ ' + (Number(data.amount) / 100).toFixed(2) : '¥ —';
+      if (data.order_type === 'agent_signup') {
+        document.querySelector('#successSection .title').textContent = '代理开通成功';
+        var dcRow = document.getElementById('displayCode').parentElement;
+        dcRow.querySelector('.info-label').textContent = '代理邀请码';
+        var dcEl = document.getElementById('displayCode');
+        dcEl.textContent = data.agent_code;
+        dcEl.style.cssText = 'font-size:22px;color:#FFD700;letter-spacing:3px';
+        var btn = document.querySelector('#successSection .btn');
+        btn.href = '/agents/login.html';
+        btn.textContent = '前往代理后台登录';
+      } else {
+        document.getElementById('displayCode').textContent = data.display_code || data.displayCode || '—';
+      }
       showSection('successSection');
       return;
     }
