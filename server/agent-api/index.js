@@ -5,8 +5,8 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const { query } = require('@poker-night/shared');
+const { query, mailer } = require('@poker-night/shared');
+const { sendCode } = mailer;
 
 const app = express();
 const PORT = process.env.AGENT_PORT || 3004;
@@ -30,22 +30,74 @@ function agentAuth(req, res, next) {
 app.get('/health', (req, res) => res.json({ ok: true, service: 'agent-api' }));
 
 // ============================================================
-// 代理登录（手机号 + 密码）
+// 发送邮箱验证码（purpose: 'login' | 'register'，与玩家端同一套 email_codes）
+// ============================================================
+app.post('/api/v1/agent/send-code', async (req, res) => {
+  const { email, purpose } = req.body;
+  if (!email || !purpose) return res.status(400).json({ error: 'missing fields' });
+  if (!['login', 'register'].includes(purpose)) return res.status(400).json({ error: 'invalid purpose' });
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return res.status(400).json({ error: 'invalid email format' });
+
+  try {
+    // 注册：邮箱不能已被代理占用；登录：邮箱必须属于某个 active 代理
+    if (purpose === 'register') {
+      const exist = await query('SELECT id FROM agents WHERE email = $1', [email]);
+      if (exist.rows.length > 0) return res.status(409).json({ error: 'email already registered' });
+    }
+    if (purpose === 'login') {
+      const exist = await query(`SELECT id FROM agents WHERE email = $1 AND status = 'active'`, [email]);
+      if (exist.rows.length === 0) return res.status(404).json({ error: 'email not found' });
+    }
+
+    // 防暴力：同一邮箱60秒内只能发一次
+    const recent = await query(
+      `SELECT created_at FROM email_codes WHERE email = $1 ORDER BY created_at DESC LIMIT 1`,
+      [email]
+    );
+    if (recent.rows.length > 0) {
+      const elapsed = Date.now() - new Date(recent.rows[0].created_at).getTime();
+      if (elapsed < 60000) {
+        const waitSec = Math.ceil((60000 - elapsed) / 1000);
+        return res.status(429).json({ error: `too many requests, try again in ${waitSec}s` });
+      }
+    }
+
+    // 生成6位验证码，存库并发送
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    await query('INSERT INTO email_codes (email, code, purpose) VALUES ($1, $2, $3)', [email, code, purpose]);
+    await sendCode(email, code, purpose);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Agent] send-code error:', err);
+    res.status(500).json({ error: 'failed to send code' });
+  }
+});
+
+// ============================================================
+// 代理登录（邮箱 + 验证码，免密码）
+// 注册不开放免费通道：统一走 payment-svc agent-signup（付费开通）
 // ============================================================
 app.post('/api/v1/agent/login', async (req, res) => {
-  const { phone, password } = req.body;
-  if (!phone || !password) return res.status(400).json({ error: 'missing credentials' });
+  const { email, code } = req.body;
+  if (!email || !code) return res.status(400).json({ error: 'missing fields' });
   try {
-    const result = await query(
-      `SELECT * FROM agents WHERE phone = $1 AND status = 'active'`, [phone]
+    const codeResult = await query(
+      `SELECT * FROM email_codes
+       WHERE email = $1 AND code = $2 AND purpose = 'login'
+         AND used = FALSE AND expires_at > NOW()
+       ORDER BY created_at DESC LIMIT 1`,
+      [email, code]
     );
+    if (codeResult.rows.length === 0) return res.status(400).json({ error: 'invalid or expired code' });
+
+    const result = await query(`SELECT * FROM agents WHERE email = $1 AND status = 'active'`, [email]);
     const agent = result.rows[0];
     if (!agent) return res.status(404).json({ error: 'agent not found' });
 
-    // 与 merchant-api 同一套密码哈希（bcryptjs，rounds=10）
-    if (!bcrypt.compareSync(password, agent.password_hash || '')) {
-      return res.status(401).json({ error: 'wrong password' });
-    }
+    await query('UPDATE email_codes SET used = TRUE WHERE id = $1', [codeResult.rows[0].id]);
 
     const token = jwt.sign({ agentId: agent.id, name: agent.name }, JWT_SECRET, { expiresIn: '1d' });
     res.json({
@@ -58,57 +110,6 @@ app.post('/api/v1/agent/login', async (req, res) => {
         parentId: agent.parent_id,
       },
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-// 下级代理注册（无鉴权，凭邀请码）
-// ============================================================
-app.post('/api/v1/agent/register', async (req, res) => {
-  const { name, phone, password, inviteCode } = req.body;
-  if (!name || !phone || !password || !inviteCode) {
-    return res.status(400).json({ error: 'missing fields' });
-  }
-  try {
-    // 邀请码必须属于某个 active 代理（作为直属上级 parent_id）
-    const parentResult = await query(
-      `SELECT id FROM agents WHERE code = $1 AND status = 'active'`, [inviteCode]
-    );
-    const parent = parentResult.rows[0];
-    if (!parent) return res.status(400).json({ error: 'invalid invite code' });
-
-    // 手机号唯一
-    const exist = await query('SELECT id FROM agents WHERE phone = $1', [phone]);
-    if (exist.rows.length > 0) return res.status(409).json({ error: 'phone already registered' });
-
-    const passwordHash = bcrypt.hashSync(password, 10);
-
-    // 自动生成 6 位邀请码（[A-Z0-9]），唯一冲突重试
-    let code = null;
-    for (let i = 0; i < 5 && !code; i++) {
-      const candidate = generateAgentCode();
-      try {
-        await query(
-          `INSERT INTO agents (code, parent_id, name, phone, password_hash, rate)
-           VALUES ($1, $2, $3, $4, $5, 20)`,
-          [candidate, parent.id, name, phone, passwordHash]
-        );
-        code = candidate;
-      } catch (err) {
-        if (err.code === '23505') {
-          if (err.constraint && err.constraint.includes('phone')) {
-            return res.status(409).json({ error: 'phone already registered' });
-          }
-          continue; // code 冲突，换码重试
-        }
-        throw err;
-      }
-    }
-    if (!code) return res.status(500).json({ error: 'failed to generate unique code' });
-
-    res.json({ ok: true, code });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -220,7 +221,7 @@ app.get('/api/v1/agent/subagents', agentAuth, async (req, res) => {
     if (me.parent_id) return res.json({ list: [] });
 
     const result = await query(
-      `SELECT a.id, a.name, a.code, a.phone, a.rate, a.created_at,
+      `SELECT a.id, a.name, a.code, a.email, a.rate, a.created_at,
               (SELECT COUNT(*) FROM venues v WHERE v.agent_id = a.id) AS venue_count,
               (SELECT COUNT(*) FROM orders o WHERE o.agent_id = a.id AND o.status = 'paid') AS paid_orders,
               (SELECT COALESCE(SUM(o.master_agent_income), 0) FROM orders o
@@ -236,7 +237,7 @@ app.get('/api/v1/agent/subagents', agentAuth, async (req, res) => {
         id: r.id,
         name: r.name,
         code: r.code,
-        phone: r.phone,
+        email: r.email,
         rate: r.rate,
         joinTime: fmt(r.created_at),
         venueCount: parseInt(r.venue_count),
@@ -366,15 +367,6 @@ app.post('/api/v1/agent/withdraw', agentAuth, async (req, res) => {
 // ============================================================
 // 辅助
 // ============================================================
-function generateAgentCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
 function fmt(d) {
   const dt = new Date(d);
   const p = (n) => String(n).padStart(2, '0');

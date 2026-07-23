@@ -13,6 +13,10 @@
     .pay-methods{display:flex;flex-direction:column;gap:10px;margin-top:6px}
     .pay-methods .btn{display:flex;align-items:center;justify-content:center;gap:8px}
     .pay-note{font-size:12px;color:var(--text-muted);text-align:center;margin-top:12px;line-height:1.7}
+    .code-row{display:flex;gap:10px}
+    .code-row input{flex:1}
+    .code-row .btn-code{flex-shrink:0;padding:0 16px;border:1px solid var(--gold-border);background:var(--gold-dim);color:var(--gold);border-radius:10px;font-size:13px;cursor:pointer;white-space:nowrap;transition:.2s}
+    .code-row .btn-code:disabled{opacity:.45;cursor:not-allowed}
   </style>
 </head>
 <body>
@@ -30,12 +34,15 @@
           <input type="text" id="name" placeholder="请输入姓名" required autocomplete="off">
         </div>
         <div class="form-group">
-          <label>手机号</label>
-          <input type="text" id="phone" placeholder="请输入手机号（登录账号）" required autocomplete="off">
+          <label>邮箱</label>
+          <input type="email" id="email" placeholder="请输入邮箱（登录账号）" required autocomplete="off">
         </div>
         <div class="form-group">
-          <label>密码</label>
-          <input type="password" id="password" placeholder="请输入密码" required>
+          <label>邮箱验证码</label>
+          <div class="code-row">
+            <input type="text" id="emailCode" placeholder="6 位验证码" required autocomplete="off" maxlength="6">
+            <button type="button" class="btn-code" id="sendBtn">发送验证码</button>
+          </div>
         </div>
         <div class="form-group">
           <label>邀请码（选填）</label>
@@ -70,6 +77,39 @@
 
   let paying = false;
 
+  // 发送注册验证码（60 秒倒计时）
+  document.getElementById('sendBtn').addEventListener('click', async () => {
+    const email = document.getElementById('email').value.trim();
+    if (!email) { showToast('请先输入邮箱', 'error'); return; }
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    try {
+      const res = await fetch('/agents/api/v1/agent/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, purpose: 'register' })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = res.status === 409 ? '该邮箱已注册，请直接登录'
+                  : res.status === 429 ? '发送太频繁，请稍后再试'
+                  : (data.error || '发送失败');
+        throw new Error(msg);
+      }
+      showToast('验证码已发送，请查收邮件', 'success');
+      let left = 60;
+      btn.textContent = left + 's';
+      const timer = setInterval(() => {
+        left--;
+        if (left <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '发送验证码'; }
+        else btn.textContent = left + 's';
+      }, 1000);
+    } catch (err) {
+      showToast(err.message, 'error');
+      btn.disabled = false;
+    }
+  });
+
   document.querySelectorAll('.pay-methods button').forEach(btn => {
     btn.addEventListener('click', () => submitSignup(btn.dataset.method, btn));
   });
@@ -77,12 +117,12 @@
   async function submitSignup(method, btn) {
     if (paying) return;
     const name = document.getElementById('name').value.trim();
-    const phone = document.getElementById('phone').value.trim();
-    const password = document.getElementById('password').value;
+    const email = document.getElementById('email').value.trim();
+    const emailCode = document.getElementById('emailCode').value.trim();
     const inviteCode = document.getElementById('inviteCode').value.trim().toUpperCase();
 
-    if (!name || !phone || !password) {
-      showToast('请先填写姓名、手机号和密码', 'error');
+    if (!name || !email || !emailCode) {
+      showToast('请先填写姓名、邮箱和验证码', 'error');
       return;
     }
 
@@ -95,14 +135,15 @@
       const res = await fetch('/pay/api/v1/payment/agent-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, password, inviteCode: inviteCode || undefined, paymentMethod: method })
+        body: JSON.stringify({ name, email, emailCode, inviteCode: inviteCode || undefined, paymentMethod: method })
       });
       const data = await res.json();
 
       if (!res.ok) {
-        const msg = res.status === 409 ? '该手机号已注册，请直接登录'
+        const msg = res.status === 409 ? '该邮箱已注册，请直接登录'
                   : (data.error === 'invalid invite code' ? '邀请码无效，请核对后重试'
-                  : (data.error || data.message || '创建订单失败'));
+                  : (data.error === 'invalid or expired email code' ? '验证码错误或已过期，请重新获取'
+                  : (data.error || data.message || '创建订单失败')));
         throw new Error(msg);
       }
 

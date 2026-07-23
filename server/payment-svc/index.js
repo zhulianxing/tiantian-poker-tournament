@@ -7,7 +7,6 @@ const cors = require('cors');
 const axios = require('axios');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const { query, db } = require('@poker-night/shared');
 const { ORDER_STATUS, FEE_SPLIT } = require('@poker-night/shared');
 
@@ -264,16 +263,28 @@ app.post('/api/v1/payment/create', async (req, res) => {
 // 代理付费注册（创建 agent_signup 订单，支付成功后开通代理账号）
 // ============================================================
 app.post('/api/v1/payment/agent-signup', async (req, res) => {
-  const { name, phone, password, inviteCode, paymentMethod } = req.body;
-  if (!name || !phone || !password) return res.status(400).json({ error: 'missing fields' });
+  const { name, email, emailCode, inviteCode, paymentMethod } = req.body;
+  if (!name || !email || !emailCode) return res.status(400).json({ error: 'missing fields' });
   if (!['wechat', 'alipay', 'usdt'].includes(paymentMethod)) {
     return res.status(400).json({ error: 'invalid paymentMethod' });
   }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return res.status(400).json({ error: 'invalid email format' });
 
   try {
-    // 手机号唯一（任何状态都占用）
-    const exist = await query('SELECT id FROM agents WHERE phone = $1', [String(phone).trim()]);
-    if (exist.rows.length > 0) return res.status(409).json({ error: 'phone already registered' });
+    // 邮箱验证码校验（purpose 'register'，由 agent-api send-code 签发）
+    const codeResult = await query(
+      `SELECT id FROM email_codes
+       WHERE email = $1 AND code = $2 AND purpose = 'register'
+         AND used = FALSE AND expires_at > NOW()
+       ORDER BY created_at DESC LIMIT 1`,
+      [email, String(emailCode).trim()]
+    );
+    if (codeResult.rows.length === 0) return res.status(400).json({ error: 'invalid or expired email code' });
+
+    // 邮箱唯一
+    const exist = await query('SELECT id FROM agents WHERE email = $1', [email]);
+    if (exist.rows.length > 0) return res.status(409).json({ error: 'email already registered' });
 
     // 邀请码选填：有 → 挂靠为该代理下级；无 → 总代
     let parentId = null;
@@ -290,10 +301,11 @@ app.post('/api/v1/payment/agent-signup', async (req, res) => {
     const amount = AGENT_SIGNUP_FEE;
     const signupPayload = {
       name: String(name).trim(),
-      phone: String(phone).trim(),
-      passwordHash: bcrypt.hashSync(password, 10),
+      email: String(email).trim(),
       parentId,
     };
+    // 验证码一次性：订单创建即作废（支付失败可重新获取）
+    await query('UPDATE email_codes SET used = TRUE WHERE id = $1', [codeResult.rows[0].id]);
 
     const orderResult = await query(
       `INSERT INTO orders (tournament_id, table_id, venue_id, amount, platform_fee, venue_income,
@@ -461,23 +473,23 @@ async function markOrderPaid(orderId) {
 // 邀请码回写到订单 agent_code，支付结果页展示
 async function activateAgentFromSignup(order) {
   const p = order.signup_payload || {};
-  if (!p.name || !p.phone || !p.passwordHash) throw new Error('bad signup_payload');
+  if (!p.name || !p.email) throw new Error('bad signup_payload');
   for (let i = 0; i < 5; i++) {
     const code = generateDisplayCode(); // 6 位邀请码（与桌号同一字符集）
     try {
       await query(
-        `INSERT INTO agents (code, parent_id, name, phone, password_hash, rate, status)
-         VALUES ($1, $2, $3, $4, $5, 20, 'active')`,
-        [code, p.parentId || null, p.name, p.phone, p.passwordHash]
+        `INSERT INTO agents (code, parent_id, name, email, rate, status)
+         VALUES ($1, $2, $3, $4, 20, 'active')`,
+        [code, p.parentId || null, p.name, p.email]
       );
       await query('UPDATE orders SET agent_code = $1 WHERE id = $2', [code, order.id]);
-      console.log('[Payment] Agent activated:', p.phone, 'code:', code);
+      console.log('[Payment] Agent activated:', p.email, 'code:', code);
       return;
     } catch (err) {
       if (err.code === '23505') {
-        if (err.constraint && err.constraint.includes('phone')) {
-          // 支付后手机号被抢注：钱已收，人工处理（不改单状态）
-          console.error('[Payment] Agent phone already registered, manual handling:', p.phone);
+        if (err.constraint && err.constraint.includes('email')) {
+          // 支付后邮箱被抢注：钱已收，人工处理（不改单状态）
+          console.error('[Payment] Agent email already registered, manual handling:', p.email);
           return;
         }
         continue; // 邀请码冲突，换码重试

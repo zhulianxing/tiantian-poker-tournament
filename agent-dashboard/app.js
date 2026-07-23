@@ -318,7 +318,7 @@
               <tr>
                 <th>姓名</th>
                 <th>邀请码</th>
-                <th>手机号</th>
+                <th>邮箱</th>
                 <th>抽成比例</th>
                 <th>门店数</th>
                 <th>已支付订单数</th>
@@ -348,7 +348,7 @@
       tbody.innerHTML = list.map(a => `<tr>
         <td>${a.name}</td>
         <td>${a.code}</td>
-        <td>${a.phone}</td>
+        <td>${a.email || '--'}</td>
         <td>${a.rate}%</td>
         <td>${a.venueCount}</td>
         <td>${a.paidOrders}</td>
