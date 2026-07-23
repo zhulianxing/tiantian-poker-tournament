@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const { SNGManager } = require('@poker-night/poker-engine');
 const { query } = require('@poker-night/shared');
-const { TOURNAMENT_STATUS, PLAYER_STATUS, ACTIONS, SNG_DEFAULTS, BOT_COMPANION } = require('@poker-night/shared');
+const { TOURNAMENT_STATUS, PLAYER_STATUS, ACTIONS, SNG_DEFAULTS, BOT_COMPANION, genBotIdentity } = require('@poker-night/shared');
 
 const app = express();
 app.use(express.json());
@@ -362,7 +362,7 @@ function startWaitCountdown(tournamentId, duration, tableCode) {
         `SELECT COUNT(*) AS humans FROM tournament_players tp
          JOIN players p ON p.id = tp.player_id
          WHERE tp.tournament_id = $1
-           AND p.nickname NOT LIKE 'Bot%' AND p.nickname NOT LIKE 'AutoBot%'`,
+           AND p.is_bot IS NOT TRUE`,
         [tournamentId]
       );
       const humans = Number(result.rows[0] ? result.rows[0].humans : 0);
@@ -459,14 +459,11 @@ async function fillBotsToFull(tournamentId, tournament) {
   if (!BOT_COMPANION.ENABLED) return;
   const maxPlayers = tournament.max_players || SNG_DEFAULTS.MAX_PLAYERS;
   const pRes = await query(
-    `SELECT tp.seat_index, p.nickname FROM tournament_players tp
+    `SELECT tp.seat_index, p.nickname, p.is_bot FROM tournament_players tp
      JOIN players p ON p.id = tp.player_id WHERE tp.tournament_id = $1`,
     [tournamentId]
   );
-  const humans = pRes.rows.filter(r => {
-    const n = r.nickname || '';
-    return !n.startsWith('Bot') && !n.startsWith('AutoBot');
-  });
+  const humans = pRes.rows.filter(r => !r.is_bot);
   if (humans.length === 0) return; // 无真人不补（倒计时分支会取消赛事）
 
   const occupied = new Set(pRes.rows.map(r => r.seat_index));
@@ -474,13 +471,15 @@ async function fillBotsToFull(tournamentId, tournament) {
   if (need <= 0) return;
 
   const startChips = tournament.start_chips || SNG_DEFAULTS.START_CHIPS;
+  // 同场昵称去重（含真人昵称，避免 bot 与真人撞名）
+  const usedNicks = new Set(pRes.rows.map(r => r.nickname).filter(Boolean));
   let filled = 0;
   for (let seat = 0; seat < maxPlayers && filled < need; seat++) {
     if (occupied.has(seat)) continue;
-    const nick = 'Bot' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    const bot = genBotIdentity(usedNicks);
     const pIns = await query(
-      'INSERT INTO players (nickname, avatar) VALUES ($1, $2) RETURNING id',
-      [nick, '🤖']
+      'INSERT INTO players (nickname, avatar, is_bot) VALUES ($1, $2, true) RETURNING id',
+      [bot.nickname, bot.avatar]
     );
     await query(
       `INSERT INTO tournament_players (tournament_id, player_id, seat_index, chip_count, status)
@@ -515,7 +514,7 @@ async function startTournament(tournamentId) {
     await fillBotsToFull(tournamentId, tournament);
 
     const pResult = await query(
-      `SELECT tp.*, p.nickname FROM tournament_players tp
+      `SELECT tp.*, p.nickname, p.is_bot FROM tournament_players tp
        JOIN players p ON tp.player_id = p.id
        WHERE tp.tournament_id = $1 ORDER BY tp.seat_index`,
       [tournamentId]
@@ -527,7 +526,7 @@ async function startTournament(tournamentId) {
       chipCount: p.chip_count,
       status: p.status,
       nickname: p.nickname,
-      isBot: p.nickname?.startsWith('Bot') || p.nickname?.startsWith('AutoBot') || false,
+      isBot: p.is_bot === true,
     }));
 
     // 创建 SNG 管理器

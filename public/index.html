@@ -48,6 +48,14 @@ nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(
 .stat b{display:block;font-size:24px;color:var(--gold);font-weight:900}
 .stat span{font-size:12px;color:var(--dim)}
 
+/* 测试房间 */
+.rooms{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.room{display:block;background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:20px 12px;text-align:center;transition:.2s;backdrop-filter:blur(8px)}
+.room:hover{transform:translateY(-3px);border-color:var(--gold2);box-shadow:0 12px 32px rgba(255,215,0,.15)}
+.room .rc{font-size:25px;font-weight:900;letter-spacing:2px;background:linear-gradient(135deg,#FFE87C,#FFD700 45%,#c9a227);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.room .rs{margin-top:8px;font-size:11px;color:var(--dim);min-height:15px}
+.room .rs b{color:var(--gold)}
+
 /* 区块 */
 section{padding:64px 0}
 .sec-head{text-align:center;margin-bottom:40px}
@@ -136,6 +144,16 @@ footer p{font-size:12px;color:#55555f;line-height:2}
     </div>
   </header>
 
+  <!-- 免费测试房间 -->
+  <section id="rooms" class="fade" style="padding-top:0">
+    <div class="sec-head">
+      <div class="kick">FREE TEST ROOMS</div>
+      <h2>免费测试房 · 即点即玩</h2>
+      <p>免支付直接入座，不足 6 人由陪玩机器人补齐自动开赛</p>
+    </div>
+    <div class="rooms" id="roomGrid"></div>
+  </section>
+
   <!-- 功能 -->
   <section id="features" class="fade">
     <div class="sec-head">
@@ -209,6 +227,25 @@ footer p{font-size:12px;color:#55555f;line-height:2}
 <script>
 var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target)}})},{threshold:.12});
 document.querySelectorAll('.fade').forEach(function(el){io.observe(el)});
+
+// 免费测试房间：房号显眼展示 + 实时状态（15 秒刷新）
+var TEST_ROOMS=['TEST01','TEST02','TEST03','TEST04','TEST05','TEST06','TEST07','TEST08','TEST09','TEST10'];
+var roomGrid=document.getElementById('roomGrid');
+roomGrid.innerHTML=TEST_ROOMS.map(function(c){
+  return '<a class="room" href="/player.html?table='+c+'"><div class="rc">'+c+'</div><div class="rs" id="rs-'+c+'">查询中…</div></a>';
+}).join('');
+function refreshRooms(){
+  TEST_ROOMS.forEach(function(c){
+    fetch('/api/v1/tables/'+c+'/status').then(function(r){return r.json()}).then(function(d){
+      var el=document.getElementById('rs-'+c);if(!el)return;
+      var t=d.tournament,n=(d.players||[]).length;
+      if(t&&String(t.status).toLowerCase()==='started')el.innerHTML='<b>🔴 比赛中</b> · '+n+'/6 · 点击观战';
+      else if(t)el.innerHTML='<b>🟢 可入座</b> · '+n+'/6';
+      else el.textContent='准备中…';
+    }).catch(function(){var el=document.getElementById('rs-'+c);if(el)el.textContent='';});
+  });
+}
+refreshRooms();setInterval(refreshRooms,15000);
 </script>
 </body>
 </html>

@@ -174,7 +174,7 @@ app.post('/api/v1/auth/agent', async (req, res) => {
   const nick = nickname.trim();
   if (nick.length < 2 || nick.length > 30) return res.status(400).json({ error: 'nickname must be 2-30 chars' });
 
-  // Bot/AutoBot 前缀会被 SNG 引擎当作机器人代打（poker-socket 按昵称判定 isBot），agent 必须自己决策
+  // Bot/AutoBot 前缀由引擎保留（陪玩 Bot 以 players.is_bot 列判定，不再按昵称前缀），agent 必须自己决策
   if (/^bot/i.test(nick) || /^autobot/i.test(nick)) {
     return res.status(400).json({ error: 'nicknames starting with Bot/AutoBot are auto-played by the engine; choose another nickname' });
   }

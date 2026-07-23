@@ -627,6 +627,8 @@ function onLogin(d) {
   localStorage.setItem(LS.pid, P.me.id);
   renderLobby(); showView('lobby');
   toast('欢迎，' + P.me.nickname);
+  // 登录前带了 ?table= 房号：登录成功后直接进入该桌
+  if (P.pendingTable) { const t = P.pendingTable; P.pendingTable = null; gotoTable(t); }
 }
 function doLogout() {
   backToLobby();
@@ -1231,6 +1233,9 @@ function showFinished() {
 
 // ============ 启动 ============
 (function boot() {
+  // 支持 ?table=TEST01 直入房间（首页测试房入口）
+  const urlTable = (new URLSearchParams(location.search)).get('table');
+  const wantTable = urlTable ? urlTable.trim().toUpperCase() : '';
   const token = localStorage.getItem(LS.token);
   const nick = localStorage.getItem(LS.nick);
   if (token && nick) {
@@ -1242,7 +1247,9 @@ function showFinished() {
     } catch {}
     P.me = { id: pid, nickname: nick };
     renderLobby(); showView('lobby');
+    if (wantTable) gotoTable(wantTable);
   } else {
+    if (wantTable) P.pendingTable = wantTable;
     showView('auth');
   }
   const sb = $('sndBtn'); if (sb) sb.textContent = SND.muted ? '🔇' : '🔊';
