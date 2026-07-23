@@ -91,5 +91,25 @@ module.exports = {
         JWT_SECRET: 'poker-night-secret-2026',
       },
     },
+    {
+      name: 'boss-api',
+      script: './server/boss-api/index.js',
+      instances: 1,
+      autorestart: true,
+      max_memory_restart: '150M',
+      env: {
+        NODE_ENV: 'production',
+        BOSS_PORT: 3005,
+        DB_HOST: '127.0.0.1',
+        DB_PORT: 5432,
+        DB_NAME: 'poker_night',
+        DB_USER: 'poker',
+        DB_PASSWORD: 'poker123',
+        JWT_SECRET: 'poker-night-secret-2026',
+        // BOSS 管理端账号（单账号，修改后 pm2 restart boss-api 生效）
+        BOSS_USER: 'boss',
+        BOSS_PASS: 'TTboss2026xK9',
+      },
+    },
   ],
 };
