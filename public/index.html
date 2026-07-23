@@ -48,7 +48,7 @@ nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(
 .stat b{display:block;font-size:24px;color:var(--gold);font-weight:900}
 .stat span{font-size:12px;color:var(--dim)}
 
-/* 测试房间 */
+/* 免费房间 */
 .rooms{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 .room{display:block;background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:20px 12px;text-align:center;transition:.2s;backdrop-filter:blur(8px)}
 .room:hover{transform:translateY(-3px);border-color:var(--gold2);box-shadow:0 12px 32px rgba(255,215,0,.15)}
@@ -144,11 +144,11 @@ footer p{font-size:12px;color:#55555f;line-height:2}
     </div>
   </header>
 
-  <!-- 免费测试房间 -->
+  <!-- 免费房间 -->
   <section id="rooms" class="fade" style="padding-top:0">
     <div class="sec-head">
-      <div class="kick">FREE TEST ROOMS</div>
-      <h2>免费测试房 · 即点即玩</h2>
+      <div class="kick">FREE ROOMS</div>
+      <h2>免费房间 · 即点即玩</h2>
       <p>免支付直接入座，不足 6 人由陪玩机器人补齐自动开赛</p>
     </div>
     <div class="rooms" id="roomGrid"></div>
@@ -228,7 +228,7 @@ footer p{font-size:12px;color:#55555f;line-height:2}
 var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target)}})},{threshold:.12});
 document.querySelectorAll('.fade').forEach(function(el){io.observe(el)});
 
-// 免费测试房间：房号显眼展示 + 实时状态（15 秒刷新）
+// 免费房间：房号显眼展示 + 实时状态（15 秒刷新）
 var TEST_ROOMS=['TEST01','TEST02','TEST03','TEST04','TEST05','TEST06','TEST07','TEST08','TEST09','TEST10'];
 var roomGrid=document.getElementById('roomGrid');
 roomGrid.innerHTML=TEST_ROOMS.map(function(c){
